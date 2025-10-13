@@ -23,7 +23,7 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 ExitSetupMessage=Установка не завершена. Если вы выйдете, русификатор не будет установлен.%n%nВы сможете завершить установку, запустив программу установки позже.%n%nВыйти из программы установки?
 
 [Files]
-Source: "DeltarunePatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Code]
 const
@@ -330,7 +330,7 @@ var
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
-  PatcherZipPath := ExpandConstant('{tmp}\DeltarunePatcherCLI.7z');
+  PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
 
   ProgressPage.Show;
