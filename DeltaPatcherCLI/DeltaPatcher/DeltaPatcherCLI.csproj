@@ -40,6 +40,30 @@
     <TrimmerRootAssembly Include="UndertaleModLib" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="LocalizedText.ru.Designer.cs">
+      <DependentUpon>LocalizedText.ru.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+    </Compile>
+    <Compile Update="LocalizedText.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>LocalizedText.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="LocalizedText.ru.resx">
+      <LastGenOutput>LocalizedText.ru.Designer.cs</LastGenOutput>
+      <Generator>ResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="LocalizedText.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>LocalizedText.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <!-- UndertaleModLib почему-то игнорирует `<GenerateDocumentationFile>false</GenerateDocumentationFile>` -->
   <!-- TODO: никак не сделать чтобы заработало -->
   <Target Name="DeleteXML" AfterTargets="AfterPublish">
