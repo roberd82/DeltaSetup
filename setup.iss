@@ -65,6 +65,54 @@ en.ProgressPage1a=Performing the installation
 tr.ProgressPage1a=Выполнение установки
 en.ProgressPage1b=Please wait...
 tr.ProgressPage1b=Пожалуйста, подождите...
+en.FoundGameLoc1=DELTARUNE (Chapters 1-4) was not found in the default folders. Please specify the path manually.
+tr.FoundGameLoc1=DELTARUNE (главы 1-4) не найден в стандартных папках. Пожалуйста, укажите путь вручную.
+en.FoundGameLoc2="DELTARUNE.exe" was not found in the specified folder!
+tr.FoundGameLoc2=Не найден "DELTARUNE.exe" в указанной папке!
+en.ProgressPage2a= MB
+tr.ProgressPage2a= МБ
+en.ProgressPage2b=File size:
+tr.ProgressPage2b=Размер файла:
+en.FirstLogLine1=Error applying patch:
+tr.FirstLogLine1=Ошибка применения патча:
+en.FirstLogLine2=The installer log is saved to the file "
+tr.FirstLogLine2=Лог установщика сохранён в файл "
+en.ExceptionMsg1a=Unable to unpack archive "%s" due to an unknown error.
+tr.ExceptionMsg1a=Не удалось распаковать архив "%s" из-за неизвестной ошибки.
+en.ExceptionMsg1b=Unpacking path -
+tr.ExceptionMsg1b=Путь распаковки -
+en.ExceptionMsg2a=Unable to unpack archive "%s" - file(s) cannot be accessed, possibly because they are being used by another process.
+tr.ExceptionMsg2a=Не удалось распаковать архив "%s" - нет доступа к файлу(-ам), возможно, он(и) занят(ы) другим процессом.
+en.ExceptionMsg2b=If the game folder has the "Read-only" attribute, then remove it (don't forget to "Apply") and try again.
+tr.ExceptionMsg2b=Если у папки с игрой стоит атрибут "Только для чтения", тогда уберите его (не забудьте "Применить") и попробуйте снова.
+en.RaiseException1=Archive file not found, path -
+tr.RaiseException1=Файл архива не найден, путь -
+en.DownloadToTempWithMirror1=Loading language files...
+tr.DownloadToTempWithMirror1=Загрузка языковых файлов...
+en.DownloadToTempWithMirror2=Loading scripts...
+tr.DownloadToTempWithMirror2=Загрузка скриптов...
+en.DownloadToTempWithMirror3=An error occurred while downloading files:
+tr.DownloadToTempWithMirror3=В процессе скачивания файлов произошла ошибка:
+en.ProgressPage3a=Unpacking the patcher...
+tr.ProgressPage3a=Распаковка патчера...
+en.ProgressPage3b=Unpacking language files...
+tr.ProgressPage3b=Распаковка языковых файлов...
+en.ProgressPage3c=Unpacking scripts...
+tr.ProgressPage3c=Распаковка скриптов...
+en.ProgressPage3d=Applying the patch...
+tr.ProgressPage3d=Применение патча...
+en.HandlePatcherError1=Error applying patch, error code:
+tr.HandlePatcherError1=Ошибка применения патча, код ошибки:
+en.HandlePatcherError2=Failed to start patcher.
+tr.HandlePatcherError2=Не удалось запустить патчер.
+en.ExceptionMsg3=An error occurred during installation:
+tr.ExceptionMsg3=В процессе установки произошла ошибка:
+en.FinishedText3a=Unable to install DELTARUNE Russifier due to an error.
+tr.FinishedText3a=Не удалось установить русификатор DELTARUNE из-за ошибки.
+en.FinishedText3b=Click Finish to exit the setup program.
+tr.FinishedText3b=Нажмите «Завершить», чтобы выйти из программы установки
+en.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Russifier
+tr.FinishedHeadingLabel1=Завершение установки русификатора DELTARUNE
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -211,7 +259,7 @@ begin
     FoundGameLoc := FindGameLocation();
     if FoundGameLoc = '' then
     begin
-      MsgBox('DELTARUNE (главы 1-4) не найден в стандартных папках. Пожалуйста, укажите путь вручную.', mbInformation, MB_OK);
+      MsgBox(CustomMessage('FoundGameLoc1'), mbInformation, MB_OK);
       Exit;
     end;
   end
@@ -219,7 +267,7 @@ begin
   begin
     if not FileExists(AddBackslash(GamePathPage.Values[0]) + DeltaruneExe) then
     begin
-      MsgBox('Не найден "DELTARUNE.exe" в указанной папке!', mbError, MB_OK);
+      MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
     end;
   end;
@@ -248,8 +296,8 @@ begin
   if FileSizeBytes > 0 then
   begin
     DownloadCallback := @OnProgress;
-    FileSizeStr := Format('%.2d', [FileSizeBytes / 1024 / 1024]) + ' МБ';
-    ProgressPage.SetText(TextHeader, 'Размер файла: ' + FileSizeStr);
+    FileSizeStr := Format('%.2d', [FileSizeBytes / 1024 / 1024]) + CustomMessage('ProgressPage2a');
+    ProgressPage.SetText(TextHeader, CustomMessage('ProgressPage2b') + FileSizeStr);
   end
   else
     DownloadCallback := nil;
@@ -282,9 +330,9 @@ begin
       begin
         FirstLogLine := Copy(LogText, 1, LineEndPos - 1);
         
-        MsgBox('Ошибка применения патча: ' + FirstLogLine + #13#10
+        MsgBox(CustomMessage('FirstLogLine1') + FirstLogLine + #13#10
                + #13#10 +
-               'Лог установщика сохранён в файл "' + LogPath + '".', mbError, MB_OK);
+               CustomMessage('FirstLogLine2') + LogPath + '".', mbError, MB_OK);
         Result := True;
         Exit;
       end;
@@ -309,8 +357,8 @@ begin
   begin
     if MsgParts[1] = '1' then
     begin
-      ExceptionMsg := Format('Не удалось распаковать архив "%s" из-за неизвестной ошибки.', [ArchiveName]) + #1310 +
-                      'Путь распаковки - ' + DestDir;
+      ExceptionMsg := Format(CustomMessage('ExceptionMsg1a'), [ArchiveName]) + #1310 +
+                      CustomMessage('ExceptionMsg1b') + DestDir;
       Handled := True;
     end
     else
@@ -341,9 +389,9 @@ begin
         end;
         *)
         
-        ExceptionMsg := Format('Не удалось распаковать архив "%s" - нет доступа к файлу(-ам), возможно, он(и) занят(ы) другим процессом.', [ArchiveName]) + #13#10 +
+        ExceptionMsg := Format(CustomMessage('ExceptionMsg2a'), [ArchiveName]) + #13#10 +
                         + #13#10 +
-                        'Если у папки с игрой стоит атрибут "Только для чтения", тогда уберите его (не забудьте "Применить") и попробуйте снова.';
+                        CustomMessage('ExceptionMsg2b');
         Handled := True;
       end;
   end;
@@ -358,7 +406,7 @@ end;
 procedure ExtractArchive(const ArchiveFilePath, DestDir: String);
 begin
   if not FileExists(ArchiveFilePath) then
-    RaiseException('Файл архива не найден, путь - ' + ArchiveFilePath);
+    RaiseException(CustomMessage('RaiseException1') + ArchiveFilePath);
   
   try
     Extract7ZipArchive(ArchiveFilePath, DestDir, True, @OnProgress);
@@ -379,32 +427,32 @@ begin
 
   ProgressPage.Show;
   try
-    DownloadToTempWithMirror('Загрузка языковых файлов...', LangURL, LangURLMirror, 'lang.7z');
-    DownloadToTempWithMirror('Загрузка скриптов...', ScriptsURL, ScriptsURLMirror, 'scripts.7z');
+    DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror1'), LangURL, LangURLMirror, 'lang.7z');
+    DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror2'), ScriptsURL, ScriptsURLMirror, 'scripts.7z');
   except
-    MsgBox('В процессе скачивания файлов произошла ошибка: ' + GetExceptionMessage(), mbError, MB_OK);
+    MsgBox(CustomMessage('DownloadToTempWithMirror3') + GetExceptionMessage(), mbError, MB_OK);
     Result := False;
     Exit;
   end;
   
   try
-    ProgressPage.SetText('Распаковка патчера...', '');
+    ProgressPage.SetText(CustomMessage('ProgressPage3a'), '');
     ExtractArchive(PatcherZipPath, ExpandConstant('{tmp}'));
 
-    ProgressPage.SetText('Распаковка языковых файлов...', '');
+    ProgressPage.SetText(CustomMessage('ProgressPage3b'), '');
     ExtractArchive(LangZipPath, GamePath);
 
-    ProgressPage.SetText('Распаковка скриптов...', '');
+    ProgressPage.SetText(CustomMessage('ProgressPage3c'), '');
     ExtractArchive(ScriptsZipPath, ExpandConstant('{tmp}\scripts'));
     
-    ProgressPage.SetText('Применение патча...', '');
+    ProgressPage.SetText(CustomMessage('ProgressPage3d'), '');
     PatcherPath := ExpandConstant('{tmp}\DeltaPatcherCLI.exe');
     if Exec(PatcherPath, Format('--game "%s" --scripts "%s"', [GamePath, ExpandConstant('{tmp}\scripts')]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
       if ResultCode <> 0 then
       begin
         if not HandlePatcherError(GamePath) then
-          MsgBox('Ошибка применения патча, код ошибки: ' + IntToStr(ResultCode) + '.', mbCriticalError, MB_OK);
+          MsgBox(CustomMessage('HandlePatcherError1') + IntToStr(ResultCode) + '.', mbCriticalError, MB_OK);
         
         Result := False;
         Exit;
@@ -412,14 +460,14 @@ begin
     end
     else
     begin
-      MsgBox('Не удалось запустить патчер.', mbCriticalError, MB_OK);
+      MsgBox(CustomMessage('HandlePatcherError2'), mbCriticalError, MB_OK);
       Result := False;
       Exit;
     end;
   except
     ExceptionMsg := GetExceptionMessage();
     if ExceptionMsg <> 'empty' then
-      MsgBox('В процессе установки произошла ошибка: ' + #13#10 + GetExceptionMessage(), mbCriticalError, MB_OK);
+      MsgBox(CustomMessage('ExceptionMsg3') + #13#10 + GetExceptionMessage(), mbCriticalError, MB_OK);
     
     Result := False;
     Exit;
@@ -435,9 +483,9 @@ begin
   if CurStep = ssPostInstall then
     if not DownloadAndExtractFiles() then
     begin
-      FinishedText := 'Не удалось установить русификатор DELTARUNE из-за ошибки.' + #13#10 +
+      FinishedText := CustomMessage('FinishedText3a') + #13#10 +
                       + #13#10 +
-                      'Нажмите «Завершить», чтобы выйти из программы установки.';
+                      CustomMessage('FinishedText3b');
     end;
 end;
 
@@ -445,7 +493,7 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpFinished then
   begin
-    WizardForm.FinishedHeadingLabel.Caption := 'Завершение установки русификатора DELTARUNE';
+    WizardForm.FinishedHeadingLabel.Caption := CustomMessage('FinishedHeadingLabel1');
     WizardForm.FinishedLabel.Caption := FinishedText;
   end;
 end;
