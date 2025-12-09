@@ -281,20 +281,21 @@ begin
   Result := True;
 end;
 
-function GetLastSegment(const InputStr: string): string;
+function GetLastSegment(const InputString: String): String;
 var
   i: Integer;
 begin
-  i := Length(InputStr);
+  Result := InputString;
   
-  if i = 0 then Exit('');
-
-  while (i > 0) and (InputStr[i] <> '/') do
+  for i := Length(InputString) downto 1 do
   begin
-    i := i - 1;
+    if InputString[i] = '/' then
+    begin
+      Result := Copy(InputString, i + 1, Length(InputString) - i);
+      
+      Break;
+    end;
   end;
-
-  GetLastSegment := Copy(InputStr, i + 1, Length(InputStr) - i);
 end;
 
 procedure DownloadToTempWithMirror(const TextHeader, MainURL, MirrorURL: String);
@@ -302,7 +303,7 @@ var
   FileSizeBytes: Integer;
   FileSizeStr: String;
   DownloadCallback: TOnDownloadProgress;
-  FilenName: String;
+  FileName: String;
 begin
   FileName := GetLastSegment(MainURL);
   ProgressPage.SetText(TextHeader, '');
