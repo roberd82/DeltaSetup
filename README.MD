@@ -6,6 +6,8 @@ This is the source code for the DELTARUNE Translation installer by LazyDesman.
 
 - First, download this repo and open `DeltaPatcherCLI` in Visual Studio
 
+- In the Solution Explorer expand `DeltaPatcherCLI` and replace `ru` in `LocalizedText.ru.resx` with your language code, open the file, and replace all the Russian strings with your translated ones
+
 - Then you need to compile it (publish - `dotnet publish -f net8.0` in terminal) (it will be in `DeltaPatcherCLI/DeltaPatcher/bin/Release/net8.0/win-x64/publish/`)
 
 - Next, you need to put DeltaPatcherCLI in a 7zip archive and name it `DeltaPatcherCLI.7z`, then put it next to the `setup.iss` file.
