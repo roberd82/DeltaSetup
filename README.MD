@@ -8,7 +8,7 @@ This is the source code for the DELTARUNE Russifier installer by LazyDesman.
 
 - Then you need to compile (publish - `dotnet publish`) DeltaPatcherCLI (it's in the appropriate folder)
 
-- Next, you need to put DeltaPatcherCLI in a 7zip archive and name it "DeltarunePatcherCLI.7z"; "fast" compression is sufficient.
+- Next, you need to put DeltaPatcherCLI in a 7zip archive and name it "DeltaPatcherCLI.7z"; "fast" compression is sufficient.
 
 IMPORTANT! THE EXECUTIVE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
 

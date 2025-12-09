@@ -1,9 +1,9 @@
 [Setup]
-AppName=Russifier DELTARUNE
+AppName=DELTARUNE Translator
 AppVersion=1.4.1
 AppPublisher=LazyDesman
-DefaultDirName={autopf}\DELTARUNE Russian Patch
-OutputBaseFilename=DeltaruneRussianPatcherSetup
+DefaultDirName={autopf}\DELTARUNE Translation Patch
+OutputBaseFilename=DeltaruneTranslationInstaller
 Compression=lzma2/ultra64
 SolidCompression=yes
 SetupIconFile=icon.ico
@@ -15,17 +15,19 @@ DisableWelcomePage=no
 WizardSmallImageFile=logo.bmp
 WizardImageFile=banner.bmp
 // SetupLogging=True
+ShowLanguageDialog=auto
+UsePreviousLanguage=no
 
 [Languages]
 Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "tr"; MessagesFile: "compiler:Languages\Russian.isl"
 
 [Messages]
-en.ExitSetupMessage=The installation is not complete. If you exit, the Russifier will not be installed.%n%nYou can complete the installation by running the setup program later.%n%nDo you want to exit the setup program?
+en.ExitSetupMessage=The installation is not complete. If you exit, the Translation will not be installed.%n%nYou can complete the installation by running the setup program later.%n%nDo you want to exit the setup program?
 tr.ExitSetupMessage=Установка не завершена. Если вы выйдете, русификатор не будет установлен.%n%nВы сможете завершить установку, запустив программу установки позже.%n%nВыйти из программы установки?
 
 [CustomMessages]
-en.WelcomeLabel1=Welcome to the DELTARUNE Russifier installation wizard
+en.WelcomeLabel1=Welcome to the DELTARUNE Translation installation wizard
 tr.WelcomeLabel1=Добро пожаловать в мастер установки русификатора DELTARUNE
 en.WelcomeLabel2=This wizard will install the Translation patch for the game DELTARUNE, prepared by the LazyDesman team.
 tr.WelcomeLabel2=Этот мастер установит русификатор для игры DELTARUNE, подготовленный командой LazyDesman.
@@ -33,7 +35,7 @@ en.wpWelcome1=Installation Description
 tr.wpWelcome1=Описание установки
 en.wpWelcome2=What will be installed?
 tr.wpWelcome2=Что будет установлено?
-en.wpWelcome3=Installation of the Russifier includes:
+en.wpWelcome3=Installation of the Translation includes:
 tr.wpWelcome3=Установка русификатора включает в себя:
 en.wpWelcome4= - Installing DelTranslate
 tr.wpWelcome4= - Установка DelTranslate
@@ -57,7 +59,7 @@ en.CreateInputDirPage3=Select the folder containing "DELTARUNE.exe" and the "cha
 tr.CreateInputDirPage3=Выберите папку, содержащую "DELTARUNE.exe" и папки "chapter1_windows" ... "chapter4_windows".
 en.CreateInputDirPage4=Typically it looks like this: 
 tr.CreateInputDirPage4=Обычно это выглядит так: 
-en.FinishedText1=The DELTARUNE Russifier has been successfully installed on your computer.
+en.FinishedText1=The DELTARUNE Translation has been successfully installed on your computer.
 tr.FinishedText1=Русификатор DELTARUNE успешно установлен на ваш компьютер.
 en.FinishedText2=Click «Finish» to exit the setup program.
 tr.FinishedText2=Нажмите «Завершить», чтобы выйти из программы установки.
@@ -107,11 +109,11 @@ en.HandlePatcherError2=Failed to start patcher.
 tr.HandlePatcherError2=Не удалось запустить патчер.
 en.ExceptionMsg3=An error occurred during installation: 
 tr.ExceptionMsg3=В процессе установки произошла ошибка: 
-en.FinishedText3a=Unable to install DELTARUNE Russifier due to an error.
+en.FinishedText3a=Unable to install DELTARUNE Translation due to an error.
 tr.FinishedText3a=Не удалось установить русификатор DELTARUNE из-за ошибки.
 en.FinishedText3b=Click Finish to exit the setup program.
 tr.FinishedText3b=Нажмите «Завершить», чтобы выйти из программы установки
-en.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Russifier
+en.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translation
 tr.FinishedHeadingLabel1=Завершение установки русификатора DELTARUNE
 
 [Files]
@@ -232,7 +234,7 @@ begin
     InfoPage.ID,
     CustomMessage('CreateInputDirPage1'),
     CustomMessage('CreateInputDirPage2'),
-    CustomMessage('CreateInputDirPage3')#13#10 +
+    CustomMessage('CreateInputDirPage3') + #13#10 +
     CustomMessage('CreateInputDirPage4') + '"C:\Program Files (x86)\Steam\steamapps\common\DELTARUNE"',
     False, ''
   );
