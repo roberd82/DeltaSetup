@@ -119,6 +119,10 @@ en.OfflineQuestion1=lang.7z file found next to installer. Use it instead of down
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?     //todo: translate to Russian
 en.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?  //todo: translate to Russian
+en.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
+tr.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.  //todo: translate to Russian
+en.wpWelcome12=You can download them from here:
+tr.wpWelcome12=You can download them from here:
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -231,7 +235,11 @@ begin
     CustomMessage('wpWelcome7') + #13#10 +
     CustomMessage('wpWelcome8') + #13#10#13#10 +
     CustomMessage('wpWelcome9') + #13#10 +
-    CustomMessage('wpWelcome10')
+    CustomMessage('wpWelcome10') + #13#10#13#10 +
+    CustomMessage('wpWelcome11') + #13#10 +
+    CustomMessage('wpWelcome12') +  #13#10 +
+    LangURL + #13#10 +
+    ScriptsURL
   );
 
   GamePathPage := CreateInputDirPage(
