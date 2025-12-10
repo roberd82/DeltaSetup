@@ -115,6 +115,10 @@ en.FinishedText3b=Click Finish to exit the setup program.
 tr.FinishedText3b=Нажмите «Завершить», чтобы выйти из программы установки
 en.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translation
 tr.FinishedHeadingLabel1=Завершение установки русификатора DELTARUNE
+en.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
+tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?     //todo: translate to Russian
+en.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
+tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?  //todo: translate to Russian
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -446,7 +450,7 @@ begin
   try
     if FileExists(ExpandConstant('{src}\lang.7z')) then
     begin
-      if MsgBox('Offline lang archive found. Use it instad of downloading?', mbConfirmation, MB_YESNO) = IDYES then
+      if MsgBox(CustomMessage('OfflineQuestion1'), mbConfirmation, MB_YESNO) = IDYES then
       begin
         LangZipPath := ExpandConstant('{tmp}\lang.7z');
         CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False)
@@ -465,7 +469,7 @@ begin
     end;
     if FileExists(ExpandConstant('{src}\scripts.7z')) then
     begin
-     if MsgBox('Offline scripts archive found. Use it instad of downloading?', mbConfirmation, MB_YESNO) = IDYES then
+     if MsgBox(CustomMessage('OfflineQuestion2'), mbConfirmation, MB_YESNO) = IDYES then
       begin
         ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
         CopyFile(ExpandConstant('{src}\scripts.7z'), ScriptsZipPath, False);

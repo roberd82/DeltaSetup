@@ -26,11 +26,15 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
 
 - In the \[Messages\] and \[CustomMessages\] sections translate all the English lines to your language and replace the Russian lines with them
 
-- In the beginning of the \[Code\] section change `LangURL` and `LangURLMirror` to download links to your translation in an archived folder (in the archive the top folder should be the `lang` folder)
+- In the beginning of the \[Code\] section change `LangURL` and `LangURLMirror` to download links to your translation in a `.7z` archive (in the archive the top folder should be the `lang` folder)
 
 - And finally, compile the installer in Inno Setup.
 
 - Done, you've built your DELTARUNE translation installer!
+
+# Installing without Internet connection
+
+If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection.
 
 -----
 
