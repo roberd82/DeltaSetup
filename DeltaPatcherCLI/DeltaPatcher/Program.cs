@@ -291,7 +291,7 @@ class Program
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            WriteLine($"\"- {chapter} {LocalizedText.ApplyPatch9}\"");    //"- Глава {chapter} успешно пропатчена!"
+            WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");    //"- Глава {chapter} успешно пропатчена!"
         }
         catch (Exception ex)
         {

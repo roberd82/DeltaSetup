@@ -15,7 +15,7 @@ DisableWelcomePage=no
 WizardSmallImageFile=logo.bmp
 WizardImageFile=banner.bmp
 // SetupLogging=True
-ShowLanguageDialog=auto
+ShowLanguageDialog=yes
 UsePreviousLanguage=no
 
 [Languages]
@@ -122,7 +122,7 @@ tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of d
 en.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.  //todo: translate to Russian
 en.wpWelcome12=You can download them from here:
-tr.wpWelcome12=You can download them from here:
+tr.wpWelcome12=You can download them from here: //todo: translate to Russian
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
