@@ -45,6 +45,11 @@
     </Compile>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="apktool.jar" />
+    <EmbeddedResource Include="apktool.jar" />
+  </ItemGroup>
+
   <Target Name="DeleteXML" AfterTargets="AfterPublish">
     <Message Text="$(PublishDir)UndertaleModLib.xml" Importance="high" />
     <Exec Command="del /F /Q $(PublishDir)UndertaleModLib.xml" IgnoreExitCode="true" />

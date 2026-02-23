@@ -459,3 +459,5 @@ Output/
 /DeltaPatcherCLI.7z
 /DeltaPatcherCLI/DeltaPatcher/Properties/launchSettings.json
 /DeltaPatcherCLI/DeltaPatcher/win_x64
+
+apktool*.jar

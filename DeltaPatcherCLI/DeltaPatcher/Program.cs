@@ -76,6 +76,42 @@ class Program
             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", @"chapter3_windows\data.win");
             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", @"chapter4_windows\data.win");
 
+            if (Directory.Exists(gamePath + @"\packs")) {
+                WriteLine();
+                WriteLine("-----Android-----");
+                Apk.ExtractEmbeddedJar("apktool.jar");
+                string apkPath = gamePath + @"\packs";
+
+                if (!Directory.Exists(apkPath + @"\translated")) {
+                    Directory.CreateDirectory(apkPath + @"\translated");
+                }
+
+                FileInfo[] files = new DirectoryInfo(apkPath).GetFiles("*.apk");
+                foreach (FileInfo file in files) {
+                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{apkPath + @"\" + file.Name.Replace(".apk", "")}\" -f");
+                    switch (file.Name) {
+                        case "selector.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Menu", @"packs\" + file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter1_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", @"packs\" + file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter2_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", @"packs\" + file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter3_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", @"packs\" + file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter4_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", @"packs\" + file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                    }
+
+                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{apkPath + @"\" + file.Name.Replace(".apk", "")}\" -o \"{apkPath + @"\translated\" + file.Name}\"");
+        
+                    new DirectoryInfo(apkPath + @"\" + file.Name.Replace(".apk", "")).Delete(true);
+                }
+            }
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(true);
 
