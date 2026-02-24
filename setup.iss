@@ -75,7 +75,7 @@ tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of down
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
 tr.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome12=You can download them from here:
-tr.QuickTale1= Apply the translation mod to QuickTale apks.
+tr.DeltaQuick1= Apply the translation mod to DeltaQuick apks.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -98,7 +98,7 @@ var
   ExistingDrives: TArrayOfString;
   // a drop-down would be better, but this is fine for now
   InfoCheckbox: TNewCheckBox;
-  PatchQuicktale: Boolean;
+  PatchDeltaQuick: Boolean;
 
 procedure InitExistingDrives;
 var
@@ -204,7 +204,7 @@ begin
       Top := InfoPage.SurfaceHeight - Height - 8; 
       Left := 0;
       Width := InfoPage.SurfaceWidth;
-      Caption := CustomMessage('QuickTale1');
+      Caption := CustomMessage('DeltaQuick1');
       Checked := False;
     end;
 
@@ -236,10 +236,10 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    PatchQuicktale := InfoCheckbox.Checked;
+    PatchDeltaQuick := InfoCheckbox.Checked;
     
     FoundGameLoc := FindGameLocation();
-    if (FoundGameLoc = '') and (not PatchQuicktale) then
+    if (FoundGameLoc = '') and (not PatchDeltaQuick) then
     begin
       MsgBox(CustomMessage('FoundGameLoc1'), mbInformation, MB_OK);
       Exit;
@@ -247,7 +247,7 @@ begin
   end
   else if CurPageID = GamePathPage.ID then
   begin
-    if (not FileExists(AddBackslash(GamePathPage.Values[0]) + DeltaruneExe)) and (not PatchQuicktale) then
+    if (not FileExists(AddBackslash(GamePathPage.Values[0]) + DeltaruneExe)) and (not PatchDeltaQuick) then
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
@@ -458,7 +458,7 @@ begin
     
     ProgressPage.SetText(CustomMessage('ProgressPage3d'), '');
     PatcherPath := ExpandConstant('{tmp}\DeltaPatcherCLI.exe');
-    if PatchQuicktale then
+    if PatchDeltaQuick then
     begin
       ArgString := ' --droid';
     end
