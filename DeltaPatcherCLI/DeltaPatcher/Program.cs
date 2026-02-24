@@ -21,12 +21,12 @@ class Program
     private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
     private static readonly StringBuilder outputTextBuilder = new();
     private static bool writeOutputToFile = true;
+    private static bool droid = false;
 
     private static async Task Main(string[] args)
     {
         string gamePath = "";
         string scriptsPath = "";
-        bool droid = false;
 
         try
         {
@@ -213,7 +213,7 @@ class Program
                 WriteLine(LocalizedText.ValidatePath5);                    return false;
             }
 
-                        if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")))
+            if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")) && !droid)
             {
                 WriteLine(LocalizedText.ValidatePath6);                    return false;
             }

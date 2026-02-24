@@ -75,6 +75,7 @@ tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of down
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
 tr.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome12=You can download them from here:
+tr.QuickTale1= Apply the translation mod to QuickTale apks.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -95,6 +96,9 @@ var
   FinishedText: String;
   ForceClose: Boolean;
   ExistingDrives: TArrayOfString;
+  // a drop-down would be better, but this is fine for now
+  InfoCheckbox: TNewCheckBox;
+  PatchQuicktale: Boolean;
 
 procedure InitExistingDrives;
 var
@@ -193,6 +197,16 @@ begin
     LangURL + #13#10 +
     ScriptsURL
   );
+  InfoCheckbox := TNewCheckBox.Create(InfoPage);
+    with InfoCheckbox do
+    begin
+      Parent := InfoPage.Surface;
+      Top := InfoPage.SurfaceHeight - Height - 8; 
+      Left := 0;
+      Width := InfoPage.SurfaceWidth;
+      Caption := CustomMessage('QuickTale1');
+      Checked := False;
+    end;
 
   GamePathPage := CreateInputDirPage(
     InfoPage.ID,
@@ -222,8 +236,10 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
+    PatchQuicktale := InfoCheckbox.Checked;
+    
     FoundGameLoc := FindGameLocation();
-    if FoundGameLoc = '' then
+    if (FoundGameLoc = '') and (not PatchQuicktale) then
     begin
       MsgBox(CustomMessage('FoundGameLoc1'), mbInformation, MB_OK);
       Exit;
@@ -231,7 +247,7 @@ begin
   end
   else if CurPageID = GamePathPage.ID then
   begin
-    if not FileExists(AddBackslash(GamePathPage.Values[0]) + DeltaruneExe) then
+    if (not FileExists(AddBackslash(GamePathPage.Values[0]) + DeltaruneExe)) and (not PatchQuicktale) then
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
@@ -383,7 +399,7 @@ end;
 
 function DownloadAndExtractFiles(): Boolean;
 var
-  LangZipPath, ScriptsZipPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg: String;
+  LangZipPath, ScriptsZipPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
   ResultCode: Integer;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
@@ -442,7 +458,15 @@ begin
     
     ProgressPage.SetText(CustomMessage('ProgressPage3d'), '');
     PatcherPath := ExpandConstant('{tmp}\DeltaPatcherCLI.exe');
-    if Exec(PatcherPath, Format('--game "%s" --scripts "%s"', [GamePath, ExpandConstant('{tmp}\scripts')]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+    if PatchQuicktale then
+    begin
+      ArgString := ' --droid';
+    end
+    else
+    begin
+      ArgString := '';
+    end;
+    if Exec(PatcherPath, Format('--game "%s" --scripts "%s"%s', [GamePath, ExpandConstant('{tmp}\scripts'), ArgString]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
       if ResultCode <> 0 then
       begin
