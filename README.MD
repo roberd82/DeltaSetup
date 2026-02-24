@@ -1,6 +1,6 @@
 # What is this?
 
-This is the source code for the DELTARUNE Translation installer by LazyDesman. It can also apply Deltranslate to QuickTale.
+This is the source code for the DELTARUNE Translation installer by LazyDesman. It can also apply Deltranslate to DeltaQuick.
 
 # How to build it?
 
@@ -42,9 +42,9 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
 
 If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection.
 
-# Installing to QuickTale
-The translation mod gets applied on-top of the QuickTale patches, so you first need to get those.
-- Download [QuickTale](https://play.google.com/store/apps/details?id=com.bookerdev.quicktale&pcampaignid=web_share), and follow the instructions for it
+# Installing to DeltaQuick
+The translation mod gets applied on-top of the DeltaQuick patches, so you first need to get those.
+- Download [DeltaQuick](https://play.google.com/store/apps/details?id=com.bookerpuzzle.deltaquick&pcampaignid=web_share), and follow the instructions for it
 - After you finished, extract the .apk files from the `packs` folder with the save file manager
 - Bring them over to your PC, run the installer, and check the checkbox on the second page
 - On the third page point the installer to the folder you put the .apk files in
