@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Product>Deltranslate Installer</Product>
     <AssemblyTitle>DeltraPatcherCLI</AssemblyTitle>
