@@ -1,13 +1,13 @@
 [Setup]
 AppName=DELTARUNE (your lang) Translation Installer
-AppVersion=1.5.0
+AppVersion=1.6.0
 AppPublisher=LazyDesman
 DefaultDirName={autopf}\DELTARUNE Translation Patch
 OutputBaseFilename=DeltaruneTranslationInstaller
 Compression=lzma2/ultra64
 SolidCompression=yes
 SetupIconFile=icon.ico
-WizardStyle=modern
+WizardStyle=modern dynamic
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
 DisableDirPage=yes
@@ -28,7 +28,7 @@ tr.ExitSetupMessage=The installation is not complete. If you exit, the translati
 [CustomMessages]
 
 tr.WelcomeLabel1=Welcome to the (your lang) DELTRANSLATE installation wizard
-tr.WelcomeLabel2=This wizard will install the (put your lang or something like that) translation for the DELTARUNE.
+tr.WelcomeLabel2=This wizard will install the (put your lang or something like that) translation for DELTARUNE.
 tr.wpWelcome1=Installation Description
 tr.wpWelcome2=What will be installed?
 tr.wpWelcome3=Installation of the translation includes:
