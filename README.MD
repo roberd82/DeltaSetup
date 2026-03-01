@@ -43,6 +43,9 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
 If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection.
 
 # Installing to DeltaQuick
+
+IMPORTANT! YOU HAVE THO HAVE [JAVA JRE](https://adoptium.net/temurin/releases) INSTALLED AND IN YOUR PATH
+
 The translation mod gets applied on-top of the DeltaQuick patches, so you first need to get those.
 - Download [DeltaQuick](https://play.google.com/store/apps/details?id=com.bookerpuzzle.deltaquick&pcampaignid=web_share), and follow the instructions for it
 - After you finished, extract the .apk files from the `packs` folder with the save file manager
