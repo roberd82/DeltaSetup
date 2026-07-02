@@ -4,7 +4,6 @@
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
 
-using System;
 using System.Collections.Generic;
 using Underanalyzer.Compiler.Bytecode;
 using Underanalyzer.Compiler.Lexer;
@@ -94,11 +93,42 @@ internal sealed class FunctionCallNode : IMaybeStatementASTNode
     }
 
     /// <summary>
+    /// Checks whether there's a function call on the leftmost side of a dot.
+    /// </summary>
+    private static bool FunctionCallNodeOnLeftmostSide(DotVariableNode node)
+    {
+        while (true)
+        {
+            // Check if left expression is immediately a function call
+            if (node.LeftExpression is FunctionCallNode { Expression: SimpleVariableNode { CollapsedFromDot: false } or 
+                                                                      FunctionCallNode or SimpleFunctionCallNode or
+                                                                      AccessorNode } or 
+                                       SimpleFunctionCallNode)
+            {
+                return true;
+            }
+
+            // Recurse down dot if available
+            if (node.LeftExpression is FunctionCallNode { Expression: DotVariableNode leftDot })
+            {
+                node = leftDot;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Generates code for this node, given whether it's in part of (but not the end of) a chain.
     /// </summary>
     private void GenerateCode(BytecodeContext context, bool inChain)
     {
         VariablePatch finalVariable;
+        bool argumentsAtTheEnd = false;
 
         // For some reason, chains of function calls generate arguments before instance.
         // We'll also have an exception for DotVariableNode expressions, which is broken in the original compiler.
@@ -124,7 +154,13 @@ internal sealed class FunctionCallNode : IMaybeStatementASTNode
                 argsToUse = 1;
 
                 // Generate object ID as number
-                NumberNode.GenerateCode(context, (int)simpleVar.ExplicitInstanceType);
+                int value = (int)simpleVar.ExplicitInstanceType;
+                if (simpleVar.RoomInstanceVariable)
+                {
+                    // Add back 100000 for room instance IDs
+                    value += 100000;
+                }
+                NumberNode.GenerateCode(context, value);
                 context.ConvertDataType(DataType.Variable);
             }
             else
@@ -154,19 +190,23 @@ internal sealed class FunctionCallNode : IMaybeStatementASTNode
         else if (Expression is DotVariableNode dotVar)
         {
             // Handle pretty strange compiler quirk with no dup swaps being performed (if no dot on left side of this dot)
-            if (!inChain && dotVar.LeftExpression is 
-                    FunctionCallNode { Expression: SimpleVariableNode { CollapsedFromDot: false } or 
-                                                   FunctionCallNode or SimpleFunctionCallNode or
-                                                   AccessorNode } or 
-                    SimpleFunctionCallNode)
+            // (until a new dup swap mode was added in 2024.14.4, also handled by this logic)
+            if (!inChain && FunctionCallNodeOnLeftmostSide(dotVar))
             {
                 inChain = true;
 
-                // Push arguments to stack
-                bool prevGeneratingDotVariableCall = context.CurrentScope.GeneratingDotVariableCall;
-                context.CurrentScope.GeneratingDotVariableCall = true;
-                GenerateArguments(context);
-                context.CurrentScope.GeneratingDotVariableCall = prevGeneratingDotVariableCall;
+                // Push arguments to stack, if using old code gen
+                if (!context.CompileContext.GameContext.UsingNewChainedFunctionArgumentOrder)
+                {
+                    bool prevGeneratingDotVariableCall = context.CurrentScope.GeneratingDotVariableCall;
+                    context.CurrentScope.GeneratingDotVariableCall = true;
+                    GenerateArguments(context);
+                    context.CurrentScope.GeneratingDotVariableCall = prevGeneratingDotVariableCall;
+                }
+                else
+                {
+                    argumentsAtTheEnd = true;
+                }
 
                 // Push left expression
                 if (dotVar.LeftExpression is FunctionCallNode funcCall)
@@ -346,6 +386,19 @@ internal sealed class FunctionCallNode : IMaybeStatementASTNode
         if (!context.CompileContext.GameContext.UsingGMLv2)
         {
             context.CompileContext.PushError("Cannot call variables as functions before GMLv2 (GameMaker 2.3+)", Expression.NearbyToken);
+        }
+
+        // Push arguments to stack right at the end, if using new code gen (from an above special case)
+        if (argumentsAtTheEnd)
+        {
+            bool prevGeneratingDotVariableCall = context.CurrentScope.GeneratingDotVariableCall;
+            context.CurrentScope.GeneratingDotVariableCall = true;
+            GenerateArguments(context);
+            context.CurrentScope.GeneratingDotVariableCall = prevGeneratingDotVariableCall;
+
+            // Swap the arguments to be at the bottom of the stack.
+            // This is actually a Variable dup swap, with the arguments reversed for instruction encoding purposes.
+            context.EmitDupSwap(DataType.Int16, 2, (byte)Arguments.Count);
         }
 
         // Emit actual call

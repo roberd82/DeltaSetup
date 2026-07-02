@@ -116,6 +116,83 @@ internal sealed class SimpleFunctionCallNode : IMaybeStatementASTNode
 
         return result;
     }
+    /// <summary>
+    /// Parses a template string from the given context's current position, and returns
+    /// a corresponding function call node for that string.
+    /// </summary>
+    public static IASTNode ParseTemplateString(ParseContext context)
+    {
+        var startToken = context.Tokens[context.Position - 1];
+
+        // Placeholder string node, to be replaced with format string later
+        List<IASTNode> arguments = new(4)
+        {
+            new StringNode("", null)
+        };
+
+        // For newer GameMaker versions, use modern template string function; otherwise, use regular string function
+        string templateStringFunction = context.CompileContext.GameContext.UsingModernTemplateStrings ?
+            VMConstants.ModernTemplateStringFunction : VMConstants.TemplateStringFunction;
+        SimpleFunctionCallNode result = new(
+            templateStringFunction, 
+            context.CompileContext.GameContext.Builtins.LookupBuiltinFunction(templateStringFunction), 
+            arguments
+        );
+
+        // Build out the format string, segment by segment
+        int fieldIndex = 0;
+        StringBuilder formatSb = new(64);
+        while (!context.EndOfCode && context.CurrentToken is not TokenTemplateStringEnd)
+        {
+            // For regular text segments, just append their contents directly
+            if (context.CurrentToken is TokenTemplateStringMiddle { Value: string value })
+            {
+                formatSb.Append(value);
+                context.Position++;
+                continue;
+            }
+
+            // For fields, parse expression and append placeholder index
+            if (context.IsCurrentToken(SeparatorKind.BlockOpen))
+            {
+                context.Position++;
+
+                // Parse field
+                if (Expressions.ParseExpression(context) is IASTNode expr)
+                {
+                    arguments.Add(expr);
+                    formatSb.Append($"{{{fieldIndex}}}"); // e.g. {0}
+                    fieldIndex++;
+                }
+                else
+                {
+                    // Failed to parse expression; stop parsing template string
+                    break;
+                }
+
+                context.EnsureToken(SeparatorKind.BlockClose);
+                continue;
+            }
+        }
+
+        // Replace first argument with final format string
+        arguments[0] = new StringNode(formatSb.ToString(), startToken);
+
+        // Move past the end of the string, or error if it wasn't found
+        if (context.EndOfCode)
+        {
+            context.CompileContext.PushError($"Unexpected end of code (expected '\"')");
+        }
+        context.Position++;
+
+        // If no arguments were actually used, we don't need to create a function at all, actually
+        if (fieldIndex == 0)
+        {
+            return arguments[0];
+        }
+
+        return result;
+    }
 
     /// <inheritdoc/>
     public IASTNode PostProcess(ParseContext context)
@@ -420,7 +497,7 @@ internal sealed class SimpleFunctionCallNode : IMaybeStatementASTNode
     /// <summary>
     /// Generates code for this function call, using a direct call (not any indirect variables, etc.).
     /// </summary>
-    public void GenerateDirectCode(BytecodeContext context, FunctionScope? overrideCallScope = null)
+    public void GenerateDirectCode(BytecodeContext context)
     {
         // Handle array copy-on-write
         if (context.CanGenerateArrayOwners)
@@ -434,8 +511,12 @@ internal sealed class SimpleFunctionCallNode : IMaybeStatementASTNode
         // Push arguments to stack
         GenerateArguments(context);
 
+        // If currently generating a function declaration header (arguments, inheritance calls),
+        // use the outer scope for function resolution. Otherwise, use current scope.
+        FunctionScope scope = context.CurrentScope.GeneratingFunctionDeclHeader ? context.CurrentScope.Parent! : context.CurrentScope;
+
         // Emit actual call instruction
-        FunctionPatch funcPatch = new(overrideCallScope ?? context.CurrentScope, FunctionName, BuiltinFunction);
+        FunctionPatch funcPatch = new(scope, FunctionName, BuiltinFunction);
         context.EmitCall(funcPatch, Arguments.Count);
         context.PushDataType(DataType.Variable);
 

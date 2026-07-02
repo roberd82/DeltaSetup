@@ -121,6 +121,12 @@ public interface IDecompileSettings
     public bool CleanupLocalVarDeclarations { get; }
 
     /// <summary>
+    /// If true, the decompiler will make an attempt to rewrite calls to <tt>string</tt>/<tt>@@string@@</tt> as template strings,
+    /// as it pertains to the game context and its GameMaker version.
+    /// </summary>
+    public bool CleanupTemplateStrings { get; }
+
+    /// <summary>
     /// If true, enum values that are detected in a code entry (including any unknown ones) will 
     /// be given declarations at the top of the code.
     /// </summary>
@@ -184,11 +190,12 @@ public class DecompileSettings : IDecompileSettings
     public bool CleanupDefaultArgumentValues { get; set; } = true;
     public bool CleanupBuiltinArrayVariables { get; set; } = true;
     public bool CleanupLocalVarDeclarations { get; set; } = true;
+    public bool CleanupTemplateStrings { get; set; } = true;
     public bool CreateEnumDeclarations { get; set; } = true;
     public string UnknownEnumName { get; set; } = "UnknownEnum";
     public string UnknownEnumValuePattern { get; set; } = "Value_{0}";
     public string UnknownArgumentNamePattern { get; set; } = "arg{0}";
-    public bool AllowLeftoverDataOnStack { get; set; } = false;
+    public bool AllowLeftoverDataOnStack { get; set; } = true;
 
     // Some basic data populated from code seen in the wild
     // TODO: populate this with more values by default?

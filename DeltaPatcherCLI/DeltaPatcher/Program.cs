@@ -1,17 +1,12 @@
-﻿using System;
-using System.IO;
-using System.Text.Json;
-using System.Threading.Tasks;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
+using System.Collections.Immutable;
 using System.Reflection;
-using UndertaleModLib;
 using System.Runtime;
 using System.Text;
+using UndertaleModLib;
 using UndertaleModLib.Scripting;
-using Microsoft.CodeAnalysis;
-using System.Collections.Immutable;
-using System.Globalization;
 
 namespace DeltaPatcherCLI;
 
@@ -30,7 +25,8 @@ class Program
 
         try
         {
-            WriteLine(LocalizedText.Welcome1);	            WriteLine(string.Format(LocalizedText.Version1, Version));
+            WriteLine(LocalizedText.Welcome1);
+            WriteLine(string.Format(LocalizedText.Version1, Version));
             WriteLine(LocalizedText.DevelopedBy1);
             WriteLine("-----------------------------------");
 
@@ -51,6 +47,7 @@ class Program
                 WriteLine();
                 WriteLine(LocalizedText.Usage3);
                 WriteLine("DeltarunePatcherCLI.exe --game \"C:\\Games\\DELTARUNE\" --scripts \"C:\\Temp\\scripts\"");
+
                 Environment.Exit(0);
             }
 
@@ -71,51 +68,59 @@ class Program
                                            typeof(Underanalyzer.Decompiler.DecompileContext).Assembly)
                             .WithFileEncoding(Encoding.UTF8);
 
-                                    ConsoleQuickEditSwitcher.SwitchQuickMode(false);
+            ConsoleQuickEditSwitcher.SwitchQuickMode(false);
 
-            if (!droid) {
+            if (!droid)
+            {
                 await ApplyChapterPatch(gamePath, scriptsPath, "Menu", "data.win");
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", @"chapter1_windows\data.win");
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", @"chapter2_windows\data.win");
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", @"chapter3_windows\data.win");
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", @"chapter4_windows\data.win");
-            } else {
-                 Apk.ExtractEmbeddedJar("apktool.jar");
-                 if (!Directory.Exists(gamePath + @"\translated")) {
-                     Directory.CreateDirectory(gamePath + @"\translated");
-                 }
-                 FileInfo[] files = new DirectoryInfo(gamePath).GetFiles("*.apk");
-                 foreach (FileInfo file in files) {
-                     Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{gamePath + @"\" + file.Name.Replace(".apk", "")}\" -f");
-                     switch (file.Name) {
-                         case "selector.apk":
-                             await ApplyChapterPatch(gamePath, scriptsPath, "Menu", file.Name.Replace(".apk", "") + @"\assets\game.droid");
-                             break;
-                         case "chapter1_windows.apk":
-                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", file.Name.Replace(".apk", "") + @"\assets\game.droid");
-                             break;
-                         case "chapter2_windows.apk":
-                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", file.Name.Replace(".apk", "") + @"\assets\game.droid");
-                             break;
-                         case "chapter3_windows.apk":
-                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", file.Name.Replace(".apk", "") + @"\assets\game.droid");
-                             break;
-                         case "chapter4_windows.apk":
-                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", file.Name.Replace(".apk", "") + @"\assets\game.droid");
-                             break;
-                     }
+            }
+            else
+            {
+                Apk.ExtractEmbeddedJar("apktool.jar");
+                if (!Directory.Exists(gamePath + @"\translated"))
+                {
+                    Directory.CreateDirectory(gamePath + @"\translated");
+                }
+                FileInfo[] files = new DirectoryInfo(gamePath).GetFiles("*.apk");
+                foreach (FileInfo file in files)
+                {
+                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{gamePath + @"\" + file.Name.Replace(".apk", "")}\" -f");
+                    switch (file.Name)
+                    {
+                        case "selector.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Menu", file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter1_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter2_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter3_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter4_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                    }
 
-                     Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{gamePath + @"\" + file.Name.Replace(".apk", "")}\" -o \"{gamePath + @"\translated\" + file.Name}\"");
-        
-                     new DirectoryInfo(gamePath + @"\" + file.Name.Replace(".apk", "")).Delete(true);
-                 }
+                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{gamePath + @"\" + file.Name.Replace(".apk", "")}\" -o \"{gamePath + @"\translated\" + file.Name}\"");
+
+                    new DirectoryInfo(gamePath + @"\" + file.Name.Replace(".apk", "")).Delete(true);
+                }
             }
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(true);
 
             WriteLine("-----------------------------------");
-            
-            WriteLine(LocalizedText.PatchSuccess1);                 WriteLine(LocalizedText.PatchSuccess2);                 Environment.Exit(0);
+            WriteLine(LocalizedText.PatchSuccess1);
+            WriteLine(LocalizedText.PatchSuccess2);
+
+            Environment.Exit(0);
         }
         catch (Exception ex)
         {
@@ -124,12 +129,14 @@ class Program
             if (ex is ScriptException)
             {
                 WriteLine("-----------------------------------");
-                WriteLine($"{LocalizedText.ScriptError1}");                  WriteLine(ex.Message);
+                WriteLine($"{LocalizedText.ScriptError1}");
+                WriteLine(ex.Message);
             }
             else
             {
                 WriteLine("-----------------------------------");
-                WriteLine(LocalizedText.CriticalError1);                   WriteLine(ex.Message);
+                WriteLine(LocalizedText.CriticalError1);
+                WriteLine(ex.Message);
 
                 if (ex.InnerException != null)
                 {
@@ -137,7 +144,7 @@ class Program
                     WriteLine(ex.InnerException.Message);
                 }
             }
-                
+
 
             writeOutputToFile = false;
 
@@ -153,13 +160,17 @@ class Program
                 File.WriteAllText(logPath, logText, Encoding.UTF8);
 
                 WriteLine("-----------------------------------");
-                WriteLine($"{LocalizedText.ErrorLog1} \"{logPath}\".");             }
+                WriteLine($"{LocalizedText.ErrorLog1} \"{logPath}\".");
+            }
             catch
             {
                 WriteLine("-----------------------------------");
-                WriteLine($"{LocalizedText.ErrorLog2} \"{logPath}\".");                     WriteLine(LocalizedText.ErrorLog3);                                  Console.ReadKey();
+                WriteLine($"{LocalizedText.ErrorLog2} \"{logPath}\".");
+                WriteLine(LocalizedText.ErrorLog3);
+
+                Console.ReadKey();
             }
-            
+
             Environment.Exit(2);
         }
     }
@@ -185,7 +196,8 @@ class Program
         }
         catch
         {
-            WriteLine($"{LocalizedText.ReadonlyWarning1} \"{Path.GetFileName(filePath)}\".");            }
+            WriteLine($"{LocalizedText.ReadonlyWarning1} \"{Path.GetFileName(filePath)}\".");
+        }
     }
     public static void FileCopyNoRO(string sourceFileName, string destFileName, bool overwrite = false)
     {
@@ -202,27 +214,35 @@ class Program
     {
         try
         {
-            WriteLine(LocalizedText.ValidatePath1);                                 WriteLine($"{LocalizedText.ValidatePath2} {gamePath}");                        WriteLine($"{LocalizedText.ValidatePath3} {scriptsPath}");      
-                        if (!Directory.Exists(gamePath))
+            WriteLine(LocalizedText.ValidatePath1);
+            WriteLine($"{LocalizedText.ValidatePath2} {gamePath}");
+            WriteLine($"{LocalizedText.ValidatePath3} {scriptsPath}");
+
+            if (!Directory.Exists(gamePath))
             {
-                WriteLine(LocalizedText.ValidatePath4);                  return false;
+                WriteLine(LocalizedText.ValidatePath4);
+                return false;
             }
 
             if (!Directory.Exists(scriptsPath))
             {
-                WriteLine(LocalizedText.ValidatePath5);                    return false;
+                WriteLine(LocalizedText.ValidatePath5);
+                return false;
             }
 
             if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")) && !droid)
             {
-                WriteLine(LocalizedText.ValidatePath6);                    return false;
+                WriteLine(LocalizedText.ValidatePath6);
+                return false;
             }
 
-            WriteLine(LocalizedText.ValidatePath7);             return true;
+            WriteLine(LocalizedText.ValidatePath7);
+            return true;
         }
         catch (Exception ex)
         {
-            WriteLine($"{LocalizedText.ValidatePath8} {ex.Message}");               return false;
+            WriteLine($"{LocalizedText.ValidatePath8} {ex.Message}");
+            return false;
         }
     }
 
@@ -234,22 +254,31 @@ class Program
             string scriptPath = Path.Combine(scriptsPath, chapter, "Fix.csx");
 
             WriteLine();
-            WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");                WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");                                       WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");                         
-                        if (!File.Exists(dataWinPath))
+            WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
+            WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
+            WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
+
+            if (!File.Exists(dataWinPath))
             {
-                throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");                 }
+                throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");
+            }
 
             if (!File.Exists(scriptPath))
             {
-                throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");               }
+                throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");
+            }
 
-            WriteLine(LocalizedText.ApplyPatch6);                 UndertaleData data;
+            WriteLine(LocalizedText.ApplyPatch6);
+            
+            UndertaleData data;
             using (var fileStream = File.OpenRead(dataWinPath))
             {
                 data = UndertaleIO.Read(fileStream);
             }
 
-            WriteLine(LocalizedText.ApplyPatch7);                 var script = File.ReadAllText(scriptPath);
+            WriteLine(LocalizedText.ApplyPatch7);
+            
+            var script = File.ReadAllText(scriptPath);
 
             ScriptGlobals scriptGlobals = new()
             {
@@ -258,13 +287,13 @@ class Program
                 ScriptPath = scriptPath
             };
 
-                        object prop = scriptGlobals.Data;
+            object prop = scriptGlobals.Data;
             prop = scriptGlobals.FilePath;
             prop = scriptGlobals.ScriptPath;
             scriptGlobals.ScriptMessage(null, true);
             scriptGlobals.ScriptWarning(null, true);
             scriptGlobals.ScriptError(null, true);
-            scriptGlobals.SyncBinding(null, true);
+            scriptGlobals.MainThreadAction(() => { });
             scriptGlobals.SetProgressBar(null, null, -1, -1);
             scriptGlobals.UpdateProgressValue(-1);
             scriptGlobals.IncrementProgress();
@@ -277,22 +306,26 @@ class Program
                                                  baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
             await CSharpScript.RunAsync(script, scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
 
-            WriteLine(LocalizedText.ApplyPatch8);                 using (var fileStream = FileCreateNoRO(dataWinPath))
+            WriteLine(LocalizedText.ApplyPatch8);
+
+            using (var fileStream = FileCreateNoRO(dataWinPath))
             {
                 UndertaleIO.Write(fileStream, data);
             }
 
-                        scriptGlobals.Data = null;
+            scriptGlobals.Data = null;
             data.Dispose();
 
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
             GC.WaitForPendingFinalizers();
 
-            WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");            }
+            WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
+        }
         catch (Exception ex)
         {
-            WriteLine($"{LocalizedText.ApplyPatchError1} {chapter}:");                  WriteLine(ex.Message);
+            WriteLine($"{LocalizedText.ApplyPatchError1} {chapter}:");
+            WriteLine(ex.Message);
 
             if (ex.InnerException != null)
             {
@@ -307,19 +340,17 @@ class Program
 
 public class ScriptGlobals
 {
-        public class ScriptException : UndertaleModLib.Scripting.ScriptException
+    public class ScriptException : UndertaleModLib.Scripting.ScriptException
     {
-                public ScriptException() : base() { }
-                public ScriptException(string msg) : base(msg) { }
+        public ScriptException() : base() { }
+        public ScriptException(string msg) : base(msg) { }
     }
 
     public UndertaleData Data { get; set; }
     public string FilePath { get; set; }
     public string ScriptPath { get; set; }
 
-    public void SyncBinding(string resourceType, bool enable)
-    {
-            }
+    public Action<Action> MainThreadAction => static (f) => f();
 
     public void ScriptMessage(string message, bool dummy = false)
     {
@@ -329,22 +360,25 @@ public class ScriptGlobals
     public void ScriptWarning(string message, bool dummy = false)
     {
         if (!dummy)
-            Program.WriteLine($"[{LocalizedText.Warning1}] {message}");      }
+            Program.WriteLine($"[{LocalizedText.Warning1}] {message}");
+    }
     public void ScriptError(string message, bool dummy = false)
     {
         if (!dummy)
         {
-            string text = $"[{LocalizedText.Error1}] {message}";                Program.WriteLine(text, onlyToFile: true);
+            string text = $"[{LocalizedText.Error1}] {message}";
+            Program.WriteLine(text, onlyToFile: true);
+
             Console.Error.WriteLine(text);
         }
     }
 
-        public void SetProgressBar(string message, string status, double currentValue, double maxValue) { }
+    public void SetProgressBar(string message, string status, double currentValue, double maxValue) { }
     public void UpdateProgressValue(double currentValue) { }
     public void IncrementProgress() { }
     public int GetProgress() => -1;
 
-        public void ShowMessage(string message, bool dummy = false)
+    public void ShowMessage(string message, bool dummy = false)
     {
         if (!dummy)
             Win32API.ShowMessage(message);

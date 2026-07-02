@@ -37,8 +37,11 @@ public sealed class ASTPrinter(DecompileContext context)
     internal HashSet<string> LocalVariableNames { get => TopFragmentContext!.LocalVariableNames; }
 
     /// <summary>
-    /// The stack used to manage fragment contexts.
+    /// Stack used to manage fragment contexts.
     /// </summary>
+    /// <remarks>
+    /// This is required because sometimes a fragment context's parent is not nested correctly, i.e. an anonymous function within a struct.
+    /// </remarks>
     private Stack<ASTFragmentContext> FragmentContextStack { get; } = new();
 
     /// <summary>
@@ -253,7 +256,7 @@ public sealed class ASTPrinter(DecompileContext context)
     /// <summary>
     /// Looks up a function name, given a function reference.
     /// </summary>
-    public string LookupFunction(IGMFunction function, ASTFragmentContext? overrideContext = null)
+    public string LookupFunction(IGMFunction function)
     {
         if (Context.GameContext.GlobalFunctions.TryGetFunctionName(function, out string? name))
         {
@@ -262,14 +265,30 @@ public sealed class ASTPrinter(DecompileContext context)
         }
 
         string funcName = function.Name.Content;
-        ASTFragmentContext fragmentContext = overrideContext ?? TopFragmentContext!;
+        ASTFragmentContext fragmentContext = TopFragmentContext!;
+        if (fragmentContext.InFunctionDeclHeader)
+        {
+            // If within a function declaration header (arguments, inheritance call), use parent fragment
+            fragmentContext = fragmentContext.Parent!;
+        }
         if (fragmentContext.SubFunctionNames.TryGetValue(funcName, out string? realName))
         {
             // We found a sub-function name within this fragment!
             return realName;
         }
 
-        // If new function resolution is used, check parent fragment contexts for any sub-function names
+        // If this is a call within a struct, look one level higher for sub-function names
+        if (fragmentContext.StructArguments is not null && fragmentContext.Parent is not null)
+        {
+            fragmentContext = fragmentContext.Parent;
+            if (fragmentContext.SubFunctionNames.TryGetValue(funcName, out realName))
+            {
+                // We found a sub-function name in the immediate parent's fragment!
+                return realName;
+            }
+        }
+
+        // If new function resolution is used, check *all* parent fragment contexts for any sub-function names
         if (Context.GameContext.UsingNewFunctionResolution)
         {
             while (fragmentContext.Parent is not null)

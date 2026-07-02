@@ -4,6 +4,7 @@
   file, You can obtain one at https://mozilla.org/MPL/2.0/.
 */
 
+using System;
 using System.Collections.Generic;
 using Underanalyzer.Decompiler.GameSpecific;
 
@@ -61,7 +62,7 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
             Arguments[i] = Arguments[i].Clean(cleaner);
         }
 
-        // Handle special instance types
+        // Handle special instance types and template strings
         switch (Function.Name.Content)
         {
             case VMConstants.SelfFunction:
@@ -71,13 +72,40 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
             case VMConstants.GlobalFunction:
                 return new InstanceTypeNode(IGMInstruction.InstanceType.Global, true) { Duplicated = Duplicated, StackType = StackType };
             case VMConstants.GetInstanceFunction:
-                if (Arguments.Count == 0 || Arguments[0] is not Int16Node)
+                if (Arguments.Count == 0 || Arguments[0] is not (Int16Node or Int32Node))
                 {
-                    throw new DecompilerException($"Expected 16-bit integer parameter to {VMConstants.GetInstanceFunction}");
+                    throw new DecompilerException($"Expected 16-bit or 32-bit integer parameter to {VMConstants.GetInstanceFunction}");
+                }
+                if (Arguments[0] is Int32Node int32)
+                {
+                    // If not using room instance references, transform into one for cleanliness.
+                    // If room instance references *are* being used, this would instead already be an AssetReferenceNode.
+                    if (!cleaner.Context.GameContext.UsingRoomInstanceReferences)
+                    {
+                        Arguments[0] = new AssetReferenceNode(int32.Value, AssetType.RoomInstance);
+                    }
                 }
                 Arguments[0].Duplicated = true;
                 Arguments[0].StackType = StackType;
                 return Arguments[0];
+            case VMConstants.TemplateStringFunction:
+                {
+                    IGameContext context = cleaner.Context.GameContext;
+                    if (context.UsingTemplateStrings && !context.UsingModernTemplateStrings)
+                    {
+                        return CleanupTemplateString(cleaner, false);
+                    }
+                    break;
+                }
+            case VMConstants.ModernTemplateStringFunction:
+                {
+                    IGameContext context = cleaner.Context.GameContext;
+                    if (context.UsingTemplateStrings && context.UsingModernTemplateStrings)
+                    {
+                        return CleanupTemplateString(cleaner, true);
+                    }
+                    break;
+                }
         }
 
         return CleanupMacroTypes(cleaner);
@@ -165,12 +193,92 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
         return this;
     }
 
-    /// <summary>
-    /// Same as <see cref="Print(ASTPrinter)"/>, but with an overridable fragment context for function name lookup.
-    /// </summary>
-    public void Print(ASTPrinter printer, ASTFragmentContext? overrideFunctionLookupContext = null)
+    private IExpressionNode CleanupTemplateString(ASTCleaner cleaner, bool isModern)
     {
-        printer.Write(printer.LookupFunction(Function, overrideFunctionLookupContext));
+        // Don't attempt cleanup if not enabled
+        if (!cleaner.Context.Settings.CleanupTemplateStrings)
+        {
+            return this;
+        }
+
+        // Make sure format is valid; fall back to function call and return as-is, otherwise
+        if (Arguments is not [StringNode { Value: { Content: string format } formatRef }, ..])
+        {
+            return this;
+        }
+        if (Arguments.Count < 2)
+        {
+            return this;
+        }
+
+        // for each field, whether or not a placeholder exists
+        int nextExpectedFieldIndex = 0;
+        int maxExpectedFieldIndex = Arguments.Count - 2;
+        for (int i = 0; i < format.Length; i++)
+        {
+            // Skip non-placeholder starting characters
+            if (format[i] != '{')
+            {
+                continue;
+            }
+
+            // If the next character is the same, it can be treated as an escape on non-modern versions, and
+            // we probably just want to bail to preserve behavior... (e.g. if ported to other GM versions)
+            if (!isModern && (i + 1) < format.Length && format[i + 1] == '{')
+            {
+                return this;
+            }
+
+            // Parse the placeholder (may not necessarily be valid)
+            int startIndex = i + 1;
+            int j = startIndex;
+            bool invalidCharacter = false;
+            while (j < format.Length && format[j] != '}')
+            {
+                if (format[j] < '0' || format[j] > '9')
+                {
+                    invalidCharacter = true;
+                    break;
+                }
+                j++;
+            }
+            if (invalidCharacter || j >= format.Length || j == startIndex)
+            {
+                continue;
+            }
+            ReadOnlySpan<char> placeholderNumberText = format.AsSpan()[startIndex..j];
+            if (!int.TryParse(placeholderNumberText, out int fieldIndex))
+            {
+                continue;
+            }
+            if (fieldIndex < 0 || fieldIndex > maxExpectedFieldIndex || fieldIndex != nextExpectedFieldIndex)
+            {
+                // Totally invalid or unexpected field index... bail!
+                return this;
+            }
+
+            // Move on to next field - should be in linear order for regular interpolated strings
+            nextExpectedFieldIndex++;
+
+            // Advance to the end of the placeholder
+            i = j;
+        }
+
+        // If we didn't use exactly the number of expected indices, bail!
+        if (nextExpectedFieldIndex != (maxExpectedFieldIndex + 1))
+        {
+            return this;
+        }
+
+        // No checks failed, and this seems to be a valid (possible) template string!
+        Arguments.RemoveAt(0);
+        return new TemplateStringNode(formatRef, Arguments);
+    }
+
+    /// <inheritdoc/>
+    public void Print(ASTPrinter printer)
+    {
+        printer.Write(printer.LookupFunction(Function));
         printer.Write('(');
         for (int i = 0; i < Arguments.Count; i++)
         {
@@ -181,12 +289,6 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
             }
         }
         printer.Write(')');
-    }
-
-    /// <inheritdoc/>
-    public void Print(ASTPrinter printer)
-    {
-        Print(printer, null);
     }
 
     /// <inheritdoc/>
@@ -235,5 +337,11 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
         }
 
         return null;
+    }
+
+    /// <inheritdoc/>
+    public IEnumerable<IBaseASTNode> EnumerateChildren()
+    {
+        return Arguments;
     }
 }

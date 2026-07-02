@@ -85,7 +85,7 @@ public interface IGameContext
     public bool UsingFunctionScriptReferences { get; }
 
     /// <summary>
-    /// <see langword="true"/> if the game uses the new method of function resolution introduced in GammeMaker 2024.13; <see langword="false"/> otherwise.
+    /// <see langword="true"/> if the game uses the new method of function resolution introduced in GameMaker 2024.13; <see langword="false"/> otherwise.
     /// </summary>
     public bool UsingNewFunctionResolution { get; }
 
@@ -193,6 +193,32 @@ public interface IGameContext
     /// Before GameMaker 2024.11, this is observed to be <see langword="false"/>. Afterwards, it is <see langword="true"/>.
     /// </remarks>
     public bool UsingBuiltinDefaultArguments { get; }
+
+    /// <summary>
+    /// <see langword="true"/> if the game uses the optimized method of function declarations introduced in GameMaker 2024.14; <see langword="false"/> otherwise.
+    /// </summary>
+    public bool UsingOptimizedFunctionDeclarations { get; }
+
+    /// <summary>
+    /// <see langword="true"/> if the game uses the new chained function argument evaluation order introduced in GameMaker 2024.14.4; <see langword="false"/> otherwise.
+    /// </summary>
+    public bool UsingNewChainedFunctionArgumentOrder { get; }
+
+    /// <summary>
+    /// <see langword="true"/> if the game uses template strings; <see langword="false"/> otherwise.
+    /// </summary>
+    /// <remarks>
+    /// This alone signifies support added in GameMaker 2023.4. Modern code generation introduced in 2024.14 is different.
+    /// </remarks>
+    public bool UsingTemplateStrings { get; }
+
+    /// <summary>
+    /// <see langword="true"/> if the game uses the modern code generation for template strings; <see langword="false"/> otherwise.
+    /// </summary>
+    /// <remarks>
+    /// This changes the code generation for template strings to match what is observed in GameMaker 2024.14 and above.
+    /// </remarks>
+    public bool UsingModernTemplateStrings { get; }
 
     /// <summary>
     /// Interface for getting global functions.
