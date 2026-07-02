@@ -77,6 +77,7 @@ class Program
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", @"chapter2_windows\data.win");
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", @"chapter3_windows\data.win");
                 await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", @"chapter4_windows\data.win");
+                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", @"chapter5_windows\data.win");
             }
             else
             {
@@ -105,6 +106,9 @@ class Program
                             break;
                         case "chapter4_windows.apk":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", file.Name.Replace(".apk", "") + @"\assets\game.droid");
+                            break;
+                        case "chapter5_windows.apk":
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", file.Name.Replace(".apk", "") + @"\assets\game.droid");
                             break;
                     }
 
