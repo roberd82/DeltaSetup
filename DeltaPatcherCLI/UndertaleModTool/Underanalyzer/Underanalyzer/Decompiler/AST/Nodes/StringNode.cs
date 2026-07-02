@@ -53,26 +53,41 @@ public class StringNode(IGMString value) : IConstantNode<IGMString>, IConditiona
         printer.Write('"');
         foreach (char c in content)
         {
-            printer.Write(EscapeChar(c));
+            switch (c)
+            {
+                case '\n':
+                    printer.Write("\\n");
+                    break;
+                case '\r':
+                    printer.Write("\\r");
+                    break;
+                case '\b':
+                    printer.Write("\\b");
+                    break;
+                case '\f':
+                    printer.Write("\\f");
+                    break;
+                case '\t':
+                    printer.Write("\\t");
+                    break;
+                case '\v':
+                    printer.Write("\\v");
+                    break;
+                case '\a':
+                    printer.Write("\\a");
+                    break;
+                case '\\':
+                    printer.Write("\\\\");
+                    break;
+                case '\"':
+                    printer.Write("\\\"");
+                    break;
+                default:
+                    printer.Write(c);
+                    break;
+            }
         }
         printer.Write('"');
-    }
-
-    public static string EscapeChar(char c)
-    {
-        return c switch
-        {
-            '\n' => "\\n",
-            '\r' => "\\r",
-            '\b' => "\\b",
-            '\f' => "\\f",
-            '\t' => "\\t",
-            '\v' => "\\v",
-            '\a' => "\\a",
-            '\\' => "\\\\",
-            '"' => "\\\"",
-            _ => c.ToString(),
-        };
     }
 
     /// <inheritdoc/>

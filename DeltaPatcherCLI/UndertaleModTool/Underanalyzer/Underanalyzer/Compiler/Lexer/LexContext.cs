@@ -65,19 +65,13 @@ internal sealed class LexContext : ISubCompileContext
     }
 
     /// <summary>
-    /// Tokenizes the input text until reaching the end, or until the template
-    /// string field is closed if the <tt>inTemplateString</tt> parameter is
-    /// <see langword="true"/>. In the latter case, the closing brace is also
-    /// consumed.
+    /// Tokenizes the input text until reaching the end.
     /// </summary>
-    public int Tokenize(int startPosition = 0, bool inTemplateString = false)
+    public void Tokenize()
     {
         ReadOnlySpan<char> text = Text;
-        int pos = startPosition;
+        int pos = 0;
         bool newStrings = CompileContext.GameContext.UsingGMS2OrLater;
-
-        // Store brace nesting level for template string fields, e.g. $"{{}}"
-        int templateBraceLevel = 0;
 
         while (pos < text.Length)
         {
@@ -103,20 +97,9 @@ internal sealed class LexContext : ISubCompileContext
             {
                 pos = Identifiers.Parse(this, pos);
             }
-            else if (currChar == '$')
+            else if (currChar == '$' || (currChar == '0' && nextChar == 'x'))
             {
-                if (nextChar == '"')
-                {
-                    pos = Strings.ParseTemplate(this, pos);
-                }
-                else
-                {
-                    pos = Numbers.ParseHex(this, pos, true);
-                }
-            }
-            else if (currChar == '0' && nextChar == 'x')
-            {
-                pos = Numbers.ParseHex(this, pos, false);
+                pos = Numbers.ParseHex(this, pos, currChar == '$');
             }
             else if (char.IsDigit(currChar) || (currChar == '.' && char.IsDigit(nextChar)))
             {
@@ -153,36 +136,9 @@ internal sealed class LexContext : ISubCompileContext
                 if (!success)
                 {
                     CompileContext.PushError("Unrecognized token", this, pos);
-                    continue;
-                }
-
-                // If within a template string, adjust its brace level (until no braces left)
-                if (inTemplateString && Tokens[^1] is TokenSeparator sep)
-                {
-                    switch (sep.Kind)
-                    {
-                        case SeparatorKind.BlockOpen:
-                            templateBraceLevel++;
-                            break;
-
-                        case SeparatorKind.BlockClose:
-                            if (templateBraceLevel == 0)
-                            {
-                                return pos;
-                            }
-                            templateBraceLevel--;
-                            break;
-                    }
                 }
             }
         }
-
-        if (inTemplateString)
-        {
-            // If not returned yet, we are at the end of the code
-            CompileContext.PushError("Template string field not closed", this, startPosition);
-        }
-        return pos;
     }
 
     /// <summary>
