@@ -1,6 +1,6 @@
 [Setup]
 AppName=DELTARUNE (your lang) Translation Installer
-AppVersion=1.6.0
+AppVersion=1.6.1
 AppPublisher=LazyDesman
 DefaultDirName={autopf}\DELTARUNE Translation Patch
 OutputBaseFilename=DeltaruneTranslationInstaller
@@ -39,11 +39,12 @@ tr.wpWelcome5= - Full translation of Chapter 1
 tr.wpWelcome6= - Full translation of Chapter 2
 tr.wpWelcome7= - Full translation of Chapter 3
 tr.wpWelcome8= - Full translation of Chapter 4
-tr.wpWelcome9=The translation will be applied over your current game installation.
-tr.wpWelcome10=All game saves will remain intact.
+tr.wpWelcome9= - Full translation of Chapter 5
+tr.wpWelcome10=The translation will be applied over your current game installation.
+tr.wpWelcome11=All game saves will remain intact.
 tr.CreateInputDirPage1=Select the DELTARUNE folder
 tr.CreateInputDirPage2=Where is the game installed?
-tr.CreateInputDirPage3=Select the folder containing "DELTARUNE.exe" and the "chapter1_windows" ... "chapter4_windows" folders.
+tr.CreateInputDirPage3=Select the folder containing "DELTARUNE.exe" and the "chapter1_windows" ... "chapter5_windows" folders.
 tr.CreateInputDirPage4=Typically it looks like this: 
 tr.FinishedText1=The (your lang) translation has been successfully installed on your computer.
 tr.FinishedText2=Click «Finish» to exit the setup program.
@@ -75,8 +76,8 @@ tr.FinishedText3b=Click «Finish» to exit the setup program.
 tr.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translation
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
-tr.wpWelcome11=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
-tr.wpWelcome12=You can download them from here:
+tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
+tr.wpWelcome13=You can download them from here:
 tr.DeltaQuick1= Apply the translation mod to DeltaQuick apks.
 
 [Files]
@@ -124,7 +125,7 @@ function CheckDeltaruneLoc(DirPath: String): Boolean;
 begin
   Result := FileExists(DirPath + DeltaruneExe);
   if Result then
-    Result := FileExists(AddBackslash(DirPath) + 'chapter4_windows\data.win');
+    Result := FileExists(AddBackslash(DirPath) + 'chapter5_windows\data.win');
 end;
 
 // Search for the DELTARUNE folder
@@ -191,11 +192,12 @@ begin
     CustomMessage('wpWelcome5') + #13#10 +
     CustomMessage('wpWelcome6') + #13#10 +
     CustomMessage('wpWelcome7') + #13#10 +
-    CustomMessage('wpWelcome8') + #13#10#13#10 +
-    CustomMessage('wpWelcome9') + #13#10 +
-    CustomMessage('wpWelcome10') + #13#10#13#10 +
-    CustomMessage('wpWelcome11') + #13#10 +
-    CustomMessage('wpWelcome12') +  #13#10 +
+    CustomMessage('wpWelcome8') + #13#10 +
+    CustomMessage('wpWelcome9') + #13#10#13#10 +
+    CustomMessage('wpWelcome10') + #13#10 +
+    CustomMessage('wpWelcome11') + #13#10#13#10 +
+    CustomMessage('wpWelcome12') + #13#10 +
+    CustomMessage('wpWelcome13') +  #13#10 +
     LangURL + #13#10 +
     ScriptsURL
   );
