@@ -99,32 +99,36 @@ class Program
                 foreach (FileInfo file in files)
                 {
                     string fileName = file.Name.Replace(".apk", "");
-                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{gamePath}{DirSep}{fileName}\" -f");
+                    string jarOutDir = $"{gamePath}{DirSep}{fileName}";
+                    string assetsDir = $"{fileName}{DirSep}assets";
+
+                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{jarOutDir}\" -f");
                     switch (file.Name)
                     {
                         case "selector.apk":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Menu", $"{fileName}{DirSep}assets{DirSep}game.droid");
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Menu", $"{assetsDir}{DirSep}game.droid");
                             break;
                         case "chapter1_windows.apk":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"{fileName}{DirSep}assets{DirSep}game.droid");
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"{assetsDir}{DirSep}game.droid");
                             break;
                         case "chapter2_windows.apk":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"{fileName}{DirSep}assets{DirSep}game.droid");
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"{assetsDir}{DirSep}game.droid");
                             break;
                         case "chapter3_windows.apk":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"{fileName}{DirSep}assets{DirSep}game.droid");
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"{assetsDir}{DirSep}game.droid");
                             break;
                         case "chapter4_windows.apk":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"{fileName}{DirSep}assets{DirSep}game.droid");
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"{assetsDir}{DirSep}game.droid");
                             break;
                         case "chapter5_windows.apk":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"{fileName}{DirSep}assets{DirSep}game.droid");
+                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"{assetsDir}{DirSep}game.droid");
                             break;
                     }
 
-                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{gamePath}{DirSep}{fileName}\" -o \"{translatedPath}{DirSep}{file.Name}\"");
+                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Name}\"");
 
-                    new DirectoryInfo($"{gamePath}{DirSep}{fileName}").Delete(true);
+                    // Theoretically, it shouldn't be read-only, because it was created by "apktool"
+                    DeleteDirectoryNoRO(jarOutDir);
                 }
             }
 
@@ -197,20 +201,45 @@ class Program
             outputTextBuilder.AppendLine(line);
     }
 
-    private static void RemoveReadOnlyAttr(string filePath)
+    private static void RemoveReadOnlyAttr(string path, bool isDirectory = false)
     {
+        if (!isDirectory)
+        {
+            try
+            {
+                FileInfo fileInfo = new(path);
+                if (!fileInfo.Exists)
+                    return;
+
+                if (fileInfo.IsReadOnly)
+                    fileInfo.IsReadOnly = false;
+            }
+            catch
+            {
+                WriteLine($"{LocalizedText.ReadonlyWarningFile} \"{Path.GetFileName(path)}\".");
+            }
+
+            return;
+        }
+
         try
         {
-            if (!File.Exists(filePath))
+            DirectoryInfo dirInfo = new(path);
+            if (!dirInfo.Exists)
                 return;
 
-            FileAttributes attributes = File.GetAttributes(filePath);
-            if (attributes.HasFlag(FileAttributes.ReadOnly))
-                File.SetAttributes(filePath, attributes & ~FileAttributes.ReadOnly);
+            if (dirInfo.Attributes.HasFlag(FileAttributes.ReadOnly))
+                dirInfo.Attributes &= ~FileAttributes.ReadOnly;
+
+            foreach (FileInfo file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
+            {
+                if (file.IsReadOnly)
+                    file.IsReadOnly = false;
+            }
         }
         catch
         {
-            WriteLine($"{LocalizedText.ReadonlyWarning1} \"{Path.GetFileName(filePath)}\".");
+            WriteLine($"{LocalizedText.ReadonlyWarningDir} \"{Path.GetDirectoryName(path)}\".");
         }
     }
     public static void FileCopyNoRO(string sourceFileName, string destFileName, bool overwrite = false)
@@ -222,6 +251,11 @@ class Program
     {
         RemoveReadOnlyAttr(filePath);
         return File.Create(filePath);
+    }
+    public static void DeleteDirectoryNoRO(string dirPath)
+    {
+        RemoveReadOnlyAttr(dirPath, isDirectory: true);
+        Directory.Delete(dirPath);
     }
 
     private static bool ValidatePaths(string gamePath, string scriptsPath)
