@@ -51,8 +51,10 @@ class Program
                 WriteLine();
                 WriteLine(LocalizedText.Usage3);
 
-                char s = DirSep;
-                WriteLine($"DeltarunePatcherCLI{(IsWindows ? ".exe" : "")} --game \"C:{s}Games{s}DELTARUNE\" --scripts \"C:{s}Temp{s}scripts\"");
+                if (IsWindows)
+                    WriteLine($"DeltarunePatcherCLI.exe --game \"C:\\Games\\DELTARUNE\" --scripts \"C:\\Temp\\scripts\"");
+                else
+                    WriteLine($"DeltarunePatcherCLI --game \"/home/User/Games/DELTARUNE\" --scripts \"/home/User/Temp/scripts\"");
 
                 Environment.Exit(0);
             }
