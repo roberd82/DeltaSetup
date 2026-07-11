@@ -37,5 +37,7 @@
         public const string ApplyPatchError1 	= "!!! ERROR WHILE PATCHING";
         public const string Error1 	            = "ERROR";
         public const string Warning1 	        = "WARNING";
+        public const string ScriptMessage1      = "[SCRIPT MESSAGE]";
+        public const string ScriptWarning1      = "[SCRIPT WARNING]";
     }
 }

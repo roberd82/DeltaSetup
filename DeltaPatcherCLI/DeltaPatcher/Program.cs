@@ -431,11 +431,21 @@ public class ScriptGlobals
     public void ShowMessage(string message, bool dummy = false)
     {
         if (!dummy)
-            Win32API.ShowMessage(message);
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                Win32API.ShowMessage(message);
+            else
+                Program.WriteLine($"{LocalizedText.ScriptMessage1} {message}");
+        }
     }
     public void ShowWarning(string message, bool dummy = false)
     {
         if (!dummy)
-            Win32API.ShowWarning(message);
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                Win32API.ShowWarning(message);
+            else
+                Program.WriteLine($"{LocalizedText.ScriptWarning1} {message}");
+        }
     }
 }

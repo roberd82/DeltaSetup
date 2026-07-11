@@ -2,31 +2,34 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace DeltaPatcherCLI
 {
     // https://stackoverflow.com/a/36720802/12136394
+    // Ideally, `[SupportedOSPlatform("windows")]` should be here
     public static class ConsoleQuickEditSwitcher
     {
-
         private const uint ENABLE_QUICK_EDIT = 0x0040;
 
         // STD_INPUT_HANDLE (DWORD): -10 is the standard input device.
         private const int STD_INPUT_HANDLE = -10;
 
-        [DllImport("kernel32.dll", SetLastError = true)]
+        [DllImport("kernel32.dll", SetLastError = true), SupportedOSPlatform("windows")]
         private static extern IntPtr GetStdHandle(int nStdHandle);
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll"), SupportedOSPlatform("windows")]
         private static extern bool GetConsoleMode(IntPtr hConsoleHandle, out uint lpMode);
 
-        [DllImport("kernel32.dll")]
+        [DllImport("kernel32.dll"), SupportedOSPlatform("windows")]
         private static extern bool SetConsoleMode(IntPtr hConsoleHandle, uint dwMode);
 
         public static bool SwitchQuickMode(bool enable)
         {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return true;
 
             IntPtr consoleHandle = GetStdHandle(STD_INPUT_HANDLE);
 

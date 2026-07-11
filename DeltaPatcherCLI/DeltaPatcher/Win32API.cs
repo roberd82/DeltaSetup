@@ -2,11 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace DeltaPatcherCLI
 {
+    [SupportedOSPlatform("windows")]
     internal class Win32API
     {
         internal enum MessageBoxButtons
