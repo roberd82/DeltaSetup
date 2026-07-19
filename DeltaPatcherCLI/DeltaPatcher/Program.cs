@@ -97,32 +97,34 @@ class Program
                     Directory.CreateDirectory(translatedPath);
                 }
 
-                FileInfo[] files = new DirectoryInfo(gamePath).GetFiles("*.apk");
+                FileInfo[] files = new DirectoryInfo(gamePath).GetFiles("*.apk")
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("*.pack"))
+                    .ToArray();
                 foreach (FileInfo file in files)
                 {
-                    string fileName = file.Name.Replace(".apk", "");
+                    string fileName = file.Name.Replace(".apk", "").Replace(".pack", "");
                     string jarOutDir = $"{gamePath}{DirSep}{fileName}";
                     string assetsDir = $"{fileName}{DirSep}assets";
 
                     Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{jarOutDir}\" -f");
-                    switch (file.Name)
+                    switch (fileName)
                     {
-                        case "selector.apk":
+                        case "selector":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Menu", $"{assetsDir}{DirSep}game.droid");
                             break;
-                        case "chapter1_windows.apk":
+                        case "chapter1_windows":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"{assetsDir}{DirSep}game.droid");
                             break;
-                        case "chapter2_windows.apk":
+                        case "chapter2_windows":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"{assetsDir}{DirSep}game.droid");
                             break;
-                        case "chapter3_windows.apk":
+                        case "chapter3_windows":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"{assetsDir}{DirSep}game.droid");
                             break;
-                        case "chapter4_windows.apk":
+                        case "chapter4_windows":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"{assetsDir}{DirSep}game.droid");
                             break;
-                        case "chapter5_windows.apk":
+                        case "chapter5_windows":
                             await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"{assetsDir}{DirSep}game.droid");
                             break;
                     }
