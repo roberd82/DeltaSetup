@@ -8,7 +8,8 @@
         public const string PatchSuccess1 	    = "The patch has been applied successfully!";
         public const string PatchSuccess2 	    = "Now you can launch the translated game";
         public const string PathError1 	        = "The patch could not be applied due to path errors.";
-        public const string ReadonlyWarning1    = "Warning - unable to check for (or remove) the \"Read-only\" attribute on the file";
+        public const string ReadonlyWarningFile = "Warning - unable to check for (or remove) the \"Read-only\" attribute on the file";
+        public const string ReadonlyWarningDir  = "Warning - unable to check for (or remove) the \"Read-only\" attribute on the directory or its file(s)";
         public const string ScriptError1 	    = "Script error:";
         public const string Usage1 	            = "Usage:";
         public const string Usage2 	            = "DeltarunePatcherCLI.exe --game \"path_to_the_game\" --scripts \"path_to_scripts\"";
@@ -36,5 +37,7 @@
         public const string ApplyPatchError1 	= "!!! ERROR WHILE PATCHING";
         public const string Error1 	            = "ERROR";
         public const string Warning1 	        = "WARNING";
+        public const string ScriptMessage1      = "[SCRIPT MESSAGE]";
+        public const string ScriptWarning1      = "[SCRIPT WARNING]";
     }
 }

@@ -71,9 +71,18 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
             case VMConstants.GlobalFunction:
                 return new InstanceTypeNode(IGMInstruction.InstanceType.Global, true) { Duplicated = Duplicated, StackType = StackType };
             case VMConstants.GetInstanceFunction:
-                if (Arguments.Count == 0 || Arguments[0] is not Int16Node)
+                if (Arguments.Count == 0 || Arguments[0] is not (Int16Node or Int32Node))
                 {
-                    throw new DecompilerException($"Expected 16-bit integer parameter to {VMConstants.GetInstanceFunction}");
+                    throw new DecompilerException($"Expected 16-bit or 32-bit integer parameter to {VMConstants.GetInstanceFunction}");
+                }
+                if (Arguments[0] is Int32Node int32)
+                {
+                    // If not using room instance references, transform into one for cleanliness.
+                    // If room instance references *are* being used, this would instead already be an AssetReferenceNode.
+                    if (!cleaner.Context.GameContext.UsingRoomInstanceReferences)
+                    {
+                        Arguments[0] = new AssetReferenceNode(int32.Value, AssetType.RoomInstance);
+                    }
                 }
                 Arguments[0].Duplicated = true;
                 Arguments[0].StackType = StackType;
@@ -165,12 +174,10 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
         return this;
     }
 
-    /// <summary>
-    /// Same as <see cref="Print(ASTPrinter)"/>, but with an overridable fragment context for function name lookup.
-    /// </summary>
-    public void Print(ASTPrinter printer, ASTFragmentContext? overrideFunctionLookupContext = null)
+    /// <inheritdoc/>
+    public void Print(ASTPrinter printer)
     {
-        printer.Write(printer.LookupFunction(Function, overrideFunctionLookupContext));
+        printer.Write(printer.LookupFunction(Function));
         printer.Write('(');
         for (int i = 0; i < Arguments.Count; i++)
         {
@@ -181,12 +188,6 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
             }
         }
         printer.Write(')');
-    }
-
-    /// <inheritdoc/>
-    public void Print(ASTPrinter printer)
-    {
-        Print(printer, null);
     }
 
     /// <inheritdoc/>
@@ -235,5 +236,11 @@ public class FunctionCallNode(IGMFunction function, List<IExpressionNode> argume
         }
 
         return null;
+    }
+
+    /// <inheritdoc/>
+    public IEnumerable<IBaseASTNode> EnumerateChildren()
+    {
+        return Arguments;
     }
 }

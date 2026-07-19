@@ -66,6 +66,10 @@ public class GameContextMock : IGameContext
     /// <inheritdoc/>
     public bool UsingNewFunctionResolution { get; set; } = false;
     /// <inheritdoc/>
+    public bool UsingOptimizedFunctionDeclarations { get; set; } = false;
+    /// <inheritdoc/>
+    public bool UsingNewChainedFunctionArgumentOrder { get; set; } = false;
+    /// <inheritdoc/>
     public IGlobalFunctions GlobalFunctions { get; } = new GlobalFunctions();
     /// <inheritdoc/>
     public GameSpecificRegistry GameSpecificRegistry { get; set; } = new();
