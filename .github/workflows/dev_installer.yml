@@ -48,10 +48,11 @@ jobs:
       - name: Package exe into 7z archive
         shell: pwsh
         run: |
-          $exePath = Join-Path $env:PUBLISH_DIR $env:EXE_NAME
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          $archivePath = Join-Path $env:ISS_DIR $env:ARCHIVE_NAME
-          & $sevenZip a -mx=9 $archivePath $exePath
+          $archivePath = (Join-Path (Resolve-Path $env:ISS_DIR) $env:ARCHIVE_NAME)
+          Push-Location $env:PUBLISH_DIR
+          & $sevenZip a -mx=9 $archivePath $env:EXE_NAME
+          Pop-Location
 
       - name: Install Inno Setup
         run: choco install innosetup -y
@@ -93,7 +94,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Latest build
+          name: Latest
           target_commitish: ${{ github.sha }}
           make_latest: true
           files: dist/*.exe
