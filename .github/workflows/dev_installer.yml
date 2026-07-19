@@ -1,0 +1,102 @@
+name: Build and Release Installer
+
+on:
+  push:
+    branches: [testing]
+
+permissions:
+  contents: write
+
+env:
+  # --- Adjust these to match your repo layout ---
+  APKTOOL_REPO: iBotPeaches/Apktool
+  CSPROJ_DIR: DeltaPatcherCLI/DeltaPatcher
+  SOLUTION_PATH: DeltaPatcherCLI/DeltaPatcherCLI.sln
+  PUBLISH_DIR: DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish
+  EXE_NAME: DeltaPatcherCLI.exe
+  ARCHIVE_NAME: DeltaPatcherCLI.7z
+  ISS_DIR: .                          # folder containing setup.iss
+  ISS_FILE: setup.iss
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest apktool release and rename jar
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download --repo $env:APKTOOL_REPO --pattern "*.jar" --dir apktool-dl --clobber
+          $jar = Get-ChildItem apktool-dl -Filter *.jar | Select-Object -First 1
+          Copy-Item $jar.FullName "$env:CSPROJ_DIR/apktool.jar" -Force
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish
+        shell: pwsh
+        run: dotnet publish "$env:SOLUTION_PATH" -f net10.0 -m:1
+
+      - name: Package exe into 7z archive
+        shell: pwsh
+        run: |
+          $exePath = Join-Path $env:PUBLISH_DIR $env:EXE_NAME
+          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+          & $sevenZip a -mx=9 $env:ARCHIVE_NAME $exePath
+          Copy-Item $env:ARCHIVE_NAME "$env:ISS_DIR/$env:ARCHIVE_NAME" -Force
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Compile installer
+        shell: pwsh
+        run: ISCC.exe "$env:ISS_DIR/$env:ISS_FILE"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: setup
+          path: ${{ env.ISS_DIR }}/Output/*.exe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Move "latest" tag to this commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push origin :refs/tags/latest || true
+          git push origin latest
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: setup
+          path: dist
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest build
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
