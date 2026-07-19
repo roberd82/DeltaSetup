@@ -8,14 +8,13 @@ permissions:
   contents: write
 
 env:
-  # --- Adjust these to match your repo layout ---
   APKTOOL_REPO: iBotPeaches/Apktool
   CSPROJ_DIR: DeltaPatcherCLI/DeltaPatcher
   SOLUTION_PATH: DeltaPatcherCLI/DeltaPatcherCLI.sln
   PUBLISH_DIR: DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish
   EXE_NAME: DeltaPatcherCLI.exe
   ARCHIVE_NAME: DeltaPatcherCLI.7z
-  ISS_DIR: .                          # folder containing setup.iss
+  ISS_DIR: .
   ISS_FILE: setup.iss
   DOTNET_VERSION: "10.0.x"
 
@@ -51,8 +50,8 @@ jobs:
         run: |
           $exePath = Join-Path $env:PUBLISH_DIR $env:EXE_NAME
           $sevenZip = "C:\Program Files\7-Zip\7z.exe"
-          & $sevenZip a -mx=9 $env:ARCHIVE_NAME $exePath
-          Copy-Item $env:ARCHIVE_NAME "$env:ISS_DIR/$env:ARCHIVE_NAME" -Force
+          $archivePath = Join-Path $env:ISS_DIR $env:ARCHIVE_NAME
+          & $sevenZip a -mx=9 $archivePath $exePath
 
       - name: Install Inno Setup
         run: choco install innosetup -y
