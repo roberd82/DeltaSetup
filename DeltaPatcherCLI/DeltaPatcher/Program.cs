@@ -132,7 +132,7 @@ class Program
                     Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Name}\"");
 
                     // Theoretically, it shouldn't be read-only, because it was created by "apktool"
-                    DeleteDirectoryNoRO(jarOutDir);
+                    DeleteDirectoryNoRO(jarOutDir, true);
                 }
             }
 
@@ -256,10 +256,10 @@ class Program
         RemoveReadOnlyAttr(filePath);
         return File.Create(filePath);
     }
-    public static void DeleteDirectoryNoRO(string dirPath)
+    public static void DeleteDirectoryNoRO(string dirPath, bool recursive = false)
     {
         RemoveReadOnlyAttr(dirPath, isDirectory: true);
-        Directory.Delete(dirPath);
+        Directory.Delete(dirPath, recursive);
     }
 
     private static bool ValidatePaths(string gamePath, string scriptsPath)
