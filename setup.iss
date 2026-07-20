@@ -429,7 +429,7 @@ end;
 
 function DownloadAndExtractFiles(): Boolean;
 var
-  LangZipPath, ScriptsZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
+  LangZipPath, ScriptsZipPath, ApktoolPath, ApktoolUrl, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
   ResultCode: Integer;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
