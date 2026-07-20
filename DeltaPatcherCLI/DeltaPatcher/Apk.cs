@@ -21,18 +21,4 @@ public class Apk {
 			}
 		}
 	}
-
-	public static void RunCommand(string fileName, string arguments) {
-		ProcessStartInfo startInfo = new ProcessStartInfo {
-			FileName = fileName,
-			Arguments = arguments,
-			RedirectStandardOutput = true,
-			UseShellExecute = false,
-			CreateNoWindow = true
-		};
-
-		using (Process process = Process.Start(startInfo)) {
-			process.WaitForExit();
-		}
-	}
 }

@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime;
 using System.Runtime.InteropServices;
@@ -21,6 +22,8 @@ class Program
     private static readonly StringBuilder outputTextBuilder = new();
     private static bool writeOutputToFile = true;
     private static bool droid = false;
+    private static string dataName => droid ? "game.droid" : "data.win";
+    private static OrderedDictionary<string, string> filesToPatch;      // key: chapter name, value: path to folder the data file is in relative to gamePath
 
     private static async Task Main(string[] args)
     {
@@ -42,6 +45,23 @@ class Program
                     scriptsPath = args[++i];
                 else if (args[i] == "--droid")
                     droid = true;
+                else if (args[i] == "--files")
+                {
+                    filesToPatch = [];
+                    foreach (var entry in args[++i].Split(","))
+                    {
+                        var lower = entry.ToLower().Trim();
+                        if (lower is "menu" or "chapter_select" or "selector")
+                        {
+                            filesToPatch.TryAdd("Menu", droid ? "selector" : "");
+                        }
+                        else if ((lower.StartsWith("chapter") || lower.StartsWith("ch")) && char.IsDigit(lower[^1]))
+                        {
+                            var chNum = lower[^1];
+                            filesToPatch.TryAdd($"Chapter{chNum}", $"chapter{chNum}_windows");
+                        }
+                    }
+                }
             }
 
             if (string.IsNullOrEmpty(gamePath) || string.IsNullOrEmpty(scriptsPath))
@@ -80,56 +100,90 @@ class Program
 
             if (!droid)
             {
-                await ApplyChapterPatch(gamePath, scriptsPath, "Menu", "data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"chapter1_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"chapter2_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"chapter3_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"chapter4_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"chapter5_windows{DirSep}data.win");
+                if (filesToPatch is null)
+                {
+                    // if it's null, that means the user didn't specify anything with --files, so patch every available file
+                    filesToPatch = [];
+                    if (File.Exists($"{gamePath}{DirSep}{dataName}"))
+                    {
+                        filesToPatch.TryAdd("Menu", "");
+                    }
+
+                    foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_windows"))
+                    {
+                        if (File.Exists($"{dir}{DirSep}{dataName}"))
+                        {
+                            var split = dir.Split(DirSep);
+                            filesToPatch.TryAdd(split[^1].Replace("chapter", "Chapter").Replace("_windows", ""), split[^1]);
+                        }
+                    }
+                }
+                
+                foreach (var file in filesToPatch) {
+                    await ApplyChapterPatch(gamePath, scriptsPath, file.Key, file.Value == "" ? dataName : $"{file.Value}{DirSep}{dataName}");
+                }
             }
             else
             {
-                Apk.ExtractEmbeddedJar("apktool.jar");
+                var files = new DirectoryInfo(gamePath).GetFiles("selector.apk")
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("selector.pack"))
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.apk"))
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.pack"))
+                    .ToArray();
 
-                string translatedPath = $"{gamePath}{DirSep}translated";
+                if (filesToPatch is null)
+                {
+                    filesToPatch = [];
+                    foreach (var file in files)
+                    {
+                        var split = file.Name.Split(".");
+                        filesToPatch.TryAdd(
+                            split[0] == "selector"
+                                ? "Menu"
+                                : split[0].Replace("chapter", "Chapter").Replace("_windows", ""),
+                            file.Name);
+                    }
+                }
+                else
+                {
+                    for (var i = filesToPatch.Count - 1; i >= 0; i--)
+                    {
+                        var key = filesToPatch.GetAt(i).Key;
+                        var match = false;
+                        foreach (var file in files)
+                        {
+                            var split = file.Name.Split(".");
+                            if (filesToPatch[key] != split[0])
+                            {
+                                continue;
+                            }
+                            filesToPatch[key] += $".{split[1]}";  // add back the file extension
+                            match = true;
+                            break;
+                        }
+
+                        if (!match)
+                        {
+                            filesToPatch.RemoveAt(i);       // file was selected, but wasn't found in the folder
+                        }
+                    }
+                }
+                
+                var translatedPath = $"{gamePath}{DirSep}translated";
                 if (!Directory.Exists(translatedPath))
                 {
                     Directory.CreateDirectory(translatedPath);
                 }
-
-                FileInfo[] files = new DirectoryInfo(gamePath).GetFiles("*.apk")
-                    .Concat(new DirectoryInfo(gamePath).GetFiles("*.pack"))
-                    .ToArray();
-                foreach (FileInfo file in files)
+                
+                foreach (var file in filesToPatch)
                 {
-                    string fileName = file.Name.Replace(".apk", "").Replace(".pack", "");
-                    string jarOutDir = $"{gamePath}{DirSep}{fileName}";
-                    string assetsDir = $"{fileName}{DirSep}assets";
-
-                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{jarOutDir}\" -f");
-                    switch (fileName)
-                    {
-                        case "selector":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Menu", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter1_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter2_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter3_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter4_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter5_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                    }
-
-                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Name}\"");
+                    var fileName = file.Value.Replace(".apk", "").Replace(".pack", "");
+                    var jarOutDir = $"{gamePath}{DirSep}{fileName}";
+                    var assetsDir = $"{fileName}{DirSep}assets";
+                    
+                    RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{gamePath}{DirSep}{file.Value}\" -o \"{jarOutDir}\" -f");
+                    await ApplyChapterPatch(gamePath, scriptsPath, file.Key, $"{assetsDir}{DirSep}{dataName}");
+                    RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Value}\"");
 
                     // Theoretically, it shouldn't be read-only, because it was created by "apktool"
                     DeleteDirectoryNoRO(jarOutDir, true);
@@ -194,6 +248,23 @@ class Program
             }
 
             Environment.Exit(2);
+        }
+    }
+    
+    private static void RunCommand(string fileName, string arguments)
+    {
+        ProcessStartInfo startInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using (Process process = Process.Start(startInfo))
+        {
+            process.WaitForExit();
         }
     }
 
