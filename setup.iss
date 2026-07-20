@@ -63,7 +63,7 @@ tr.ExceptionMsg2b=If the game folder has the "Read-only" attribute, then remove 
 tr.RaiseException1=Archive file not found, path - 
 tr.DownloadToTempWithMirror1=Downloading language files...
 tr.DownloadToTempWithMirror2=Downloading scripts...
-tr.DownloadToTempWithMirror3=Downloading aptool...
+tr.DownloadToTempWithMirror3=Downloading apktool...
 tr.DownloadToTempWithMirror4=An error occurred while downloading files: 
 tr.ProgressPage3a=Unpacking the patcher...
 tr.ProgressPage3b=Unpacking language files...
@@ -91,8 +91,6 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
-  ApktoolURL = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar';
-  ApktoolURLMirror = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar';
   
   DeltaruneExe = 'DELTARUNE.exe';
 var
@@ -299,6 +297,30 @@ begin
   end;
 end;
 
+function GetLatestReleaseUrl(const LatestEnpoint: String): String;
+var
+  WinHttpReq: Variant;
+  Response: String;
+  p, p2: Integer;
+  Key: String;
+begin
+  Result := '';
+  WinHttpReq := CreateOleObject('WinHttp.WinHttpRequest.5.1');
+  WinHttpReq.Open('GET', LatestEnpoint, False);
+  WinHttpReq.SetRequestHeader('User-Agent', 'Inno-Setup-Installer');
+  WinHttpReq.Send('');
+  Response := WinHttpReq.ResponseText;
+
+  Key := '"browser_download_url":"';
+  p := Pos(Key, Response);
+  if p > 0 then
+  begin
+    p := p + Length(Key);
+    p2 := Pos('"', Copy(Response, p, Length(Response)));
+    Result := Copy(Response, p, p2 - 1);
+  end;
+end;
+
 function HandlePatcherError(GamePath: String): Boolean;
 var
   LogPath, LogText, FirstLogLine: String;
@@ -413,6 +435,7 @@ begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
   ApktoolPath := ExpandConstant('{tmp}\apktool.jar');
+  ApktoolUrl := GetLatestReleaseUrl('https://api.github.com/repos/iBotPeaches/Apktool/releases/latest');
   PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
 
@@ -458,12 +481,12 @@ begin
       end
       else
       begin
-        DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolURL, ApktoolURLMirror, 'apktool.jar');
+        DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolUrl, ApktoolUrl, 'apktool.jar');
       end;
     end
     else
     begin
-      DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolURL, ApktoolURLMirror, 'apktool.jar');
+      DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolUrl, ApktoolUrl, 'apktool.jar');
     end;
 
   except
