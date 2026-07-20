@@ -50,7 +50,7 @@ tr.FinishedText1=The (your lang) translation has been successfully installed on 
 tr.FinishedText2=Click «Finish» to exit the setup program.
 tr.ProgressPage1a=Performing the installation
 tr.ProgressPage1b=Please wait...
-tr.FoundGameLoc1=DELTARUNE (Chapters 1-4) was not found in the default folders. Please specify the path manually.
+tr.FoundGameLoc1=DELTARUNE (Chapters 1-5) was not found in the default folders. Please specify the path manually.
 tr.FoundGameLoc2="DELTARUNE.exe" was not found in the specified folder!
 tr.ProgressPage2a= MB
 tr.ProgressPage2b=File size: 
@@ -78,7 +78,7 @@ tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of down
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
-tr.DeltaQuick1= Apply the translation mod to DeltaQuick apks.
+tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
