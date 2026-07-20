@@ -123,8 +123,12 @@ class Program
                     await ApplyChapterPatch(gamePath, scriptsPath, file.Key, file.Value == "" ? dataName : $"{file.Value}{DirSep}{dataName}");
                 }
             }
-            else
-            {
+            else {
+                var apktoolPath = Path.GetTempPath() + "apktool.jar";
+                if (!File.Exists(apktoolPath)) {
+                    apktoolPath = $"{AppContext.BaseDirectory}{DirSep}apktool.jar";
+                }
+                
                 var files = new DirectoryInfo(gamePath).GetFiles("selector.apk")
                     .Concat(new DirectoryInfo(gamePath).GetFiles("selector.pack"))
                     .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.apk"))
@@ -181,9 +185,9 @@ class Program
                     var jarOutDir = $"{gamePath}{DirSep}{fileName}";
                     var assetsDir = $"{fileName}{DirSep}assets";
                     
-                    RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{gamePath}{DirSep}{file.Value}\" -o \"{jarOutDir}\" -f");
+                    RunCommand("java", "-jar " + $"{apktoolPath} d -r \"{gamePath}{DirSep}{file.Value}\" -o \"{jarOutDir}\" -f");
                     await ApplyChapterPatch(gamePath, scriptsPath, file.Key, $"{assetsDir}{DirSep}{dataName}");
-                    RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Value}\"");
+                    RunCommand("java", "-jar " + $"{apktoolPath} b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Value}\"");
 
                     // Theoretically, it shouldn't be read-only, because it was created by "apktool"
                     DeleteDirectoryNoRO(jarOutDir, true);

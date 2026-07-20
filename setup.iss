@@ -63,7 +63,8 @@ tr.ExceptionMsg2b=If the game folder has the "Read-only" attribute, then remove 
 tr.RaiseException1=Archive file not found, path - 
 tr.DownloadToTempWithMirror1=Downloading language files...
 tr.DownloadToTempWithMirror2=Downloading scripts...
-tr.DownloadToTempWithMirror3=An error occurred while downloading files: 
+tr.DownloadToTempWithMirror3=Downloading aptool...
+tr.DownloadToTempWithMirror4=An error occurred while downloading files: 
 tr.ProgressPage3a=Unpacking the patcher...
 tr.ProgressPage3b=Unpacking language files...
 tr.ProgressPage3c=Unpacking scripts...
@@ -76,6 +77,7 @@ tr.FinishedText3b=Click «Finish» to exit the setup program.
 tr.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translation
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
+tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of downloading it?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
 tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
@@ -89,6 +91,8 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
+  ApktoolURL = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar'
+  ApktoolURLMirror = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar'
   
   DeltaruneExe = 'DELTARUNE.exe';
 var
@@ -408,6 +412,7 @@ var
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
+  ApktoolPath := ExpandConstant('{tmp}\apktool.jar');
   PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
 
@@ -444,8 +449,25 @@ begin
     begin
       DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror2'), ScriptsURL, ScriptsURLMirror, 'scripts.7z');
     end;
+
+    if FileExists(ExpandConstant('{src}\apktool.jar')) then
+    begin
+      if MsgBox(CustomMessage('OfflineQuestion3'), mbConfirmation, MB_YESNO) = IDYES then
+      begin
+        CopyFile(ExpandConstant('{src}\apktool.jar'), ApktoolPath, False)
+      end
+      else
+      begin
+        DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolURL, ApktoolURLMirror, 'apktool.jar');
+      end;
+    end
+    else
+    begin
+      DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolURL, ApktoolURLMirror, 'apktool.jar');
+    end;
+
   except
-    MsgBox(CustomMessage('DownloadToTempWithMirror3') + GetExceptionMessage(), mbError, MB_OK);
+    MsgBox(CustomMessage('DownloadToTempWithMirror4') + GetExceptionMessage(), mbError, MB_OK);
     Result := False;
     Exit;
   end;
