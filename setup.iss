@@ -91,8 +91,8 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
-  ApktoolURL = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar'
-  ApktoolURLMirror = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar'
+  ApktoolURL = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar';
+  ApktoolURLMirror = 'https://smartrelease.bytedream.dev/github/iBotPeaches/Apktool/apktool_%7Bmajor%7D.%7Bminor%7D.%7Bpatch%7D.jar';
   
   DeltaruneExe = 'DELTARUNE.exe';
 var
@@ -422,7 +422,7 @@ begin
     begin
       if MsgBox(CustomMessage('OfflineQuestion1'), mbConfirmation, MB_YESNO) = IDYES then
       begin
-        CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False)
+        CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False);
       end
       else
       begin
@@ -454,7 +454,7 @@ begin
     begin
       if MsgBox(CustomMessage('OfflineQuestion3'), mbConfirmation, MB_YESNO) = IDYES then
       begin
-        CopyFile(ExpandConstant('{src}\apktool.jar'), ApktoolPath, False)
+        CopyFile(ExpandConstant('{src}\apktool.jar'), ApktoolPath, False);
       end
       else
       begin
