@@ -4,7 +4,7 @@ This is the source code for the DELTARUNE Translation installer by LazyDesman. I
 
 # How to build it?
 
-(The a pre-built version in the Releases tab automatically gets recompiled on every update. It installs the mod, and downloads the English localization files. This is provided, so translation developers can install the mod if they haven't made their own installers already. ATTENTION: THE LANG FOLDER IN IN THE GAME FILES WILL BE OVERRIDDEN DURING INSTALL, BE CAREFUL TO NOT LOOSE ANY DATA!)
+(The pre-built version in the Releases tab automatically gets recompiled on every update. It installs the mod, and downloads the English localization files. This is provided, so translation developers can install the mod if they haven't made their own installers already. ATTENTION: THE LANG FOLDER IN IN THE GAME FILES WILL BE OVERRIDDEN DURING INSTALL, BE CAREFUL TO NOT LOOSE ANY DATA!)
 
 - First, download this repo and open `DeltaPatcherCLI.csproj` and `LocalizedText.cs` in Visual Studio or any other text editor.
 
