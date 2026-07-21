@@ -82,9 +82,8 @@ tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 tr.PatchSelectPage1=Select Files to Patch
 tr.PatchSelectPage2=Menu
 tr.PatchSelectPage3=Chapter
-tr.PatchSelectPage4=Only install the selected patches:
+tr.PatchSelectPage4=Only install the selected patches (if all is selected, even potentially unlisted files could be patched):
 tr.AdvancedButtonText=Advanced
-
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
