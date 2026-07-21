@@ -28,7 +28,6 @@ Name: "tr"; MessagesFile: "compiler:Default.isl"
 tr.ExitSetupMessage=The installation is not complete. If you exit, the translation will not be installed.%n%nYou can complete the installation by running the setup program later.%n%nDo you want to exit the setup program?
 
 [CustomMessages]
-
 tr.WelcomeLabel1=Welcome to the (your lang) DELTRANSLATE installation wizard
 tr.WelcomeLabel2=This wizard will install the (put your lang or something like that) translation for DELTARUNE.
 tr.wpWelcome1=Installation Description
@@ -83,7 +82,7 @@ tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
-//Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Code]
 const
@@ -92,7 +91,7 @@ const
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
-  ShowDeltaquickCheckmark = false;
+  ShowDeltaquickCheckmark = True;
 var
   InfoPage: TOutputMsgWizardPage;
   GamePathPage: TInputDirWizardPage;
@@ -104,6 +103,9 @@ var
   // a drop-down would be better, but this is fine for now
   InfoCheckbox: TNewCheckBox;
   PatchDeltaQuick: Boolean;
+  // expand the array to support more chapters in the future
+  ExtraButton: TNewButton;
+  FilesToPatch: array[0..5] of Boolean;
 
 procedure InitExistingDrives;
 var
@@ -195,6 +197,75 @@ begin
   end;
 end;
 
+// would be better to use the [Components] page, but this work too
+procedure ShowOptionsPopup;
+var
+  PopupForm: TSetupForm;
+  OKButton, CancelButton: TNewButton;
+  Checks: array of TNewCheckBox;
+  i: Integer;
+begin
+  SetLength(Checks, Length(FilesToPatch));
+  PopupForm := CreateCustomForm(ScaleX(260), ScaleY(230), False, False);
+  try
+    PopupForm.Caption := 'Select Files to Patch';
+    PopupForm.Position := poScreenCenter;
+    PopupForm.BorderStyle := bsDialog;
+
+    for i := 0 to Length(FilesToPatch) - 1 do begin
+      Checks[i] := TNewCheckBox.Create(PopupForm);
+      Checks[i].Parent := PopupForm;
+      Checks[i].Left := ScaleX(16);
+      Checks[i].Top := ScaleY(16 + i * 24);
+      Checks[i].Width := PopupForm.ClientWidth - ScaleX(32);
+      Checks[i].Height := ScaleY(20);
+      if (i = 0) then
+      begin
+        Checks[i].Caption := 'Menu';
+      end
+      else
+      begin
+        Checks[i].Caption := 'Chapter' + IntToStr(i);
+      end;
+      Checks[i].Checked := not FilesToPatch[i];
+    end;
+
+    OKButton := TNewButton.Create(PopupForm);
+    OKButton.Parent := PopupForm;
+    OKButton.Caption := 'OK';
+    OKButton.ModalResult := mrOK;
+    OKButton.Default := True;
+    OKButton.Width := ScaleX(75);
+    OKButton.Height := ScaleY(23);
+    OKButton.Top := PopupForm.ClientHeight - ScaleY(31);
+    OKButton.Left := PopupForm.ClientWidth - ScaleX(166);
+
+    CancelButton := TNewButton.Create(PopupForm);
+    CancelButton.Parent := PopupForm;
+    CancelButton.Caption := 'Cancel';
+    CancelButton.ModalResult := mrCancel;
+    CancelButton.Cancel := True;
+    CancelButton.Width := ScaleX(75);
+    CancelButton.Height := ScaleY(23);
+    CancelButton.Top := OKButton.Top;
+    CancelButton.Left := PopupForm.ClientWidth - ScaleX(85);
+
+    PopupForm.ActiveControl := OKButton;
+
+    if PopupForm.ShowModal() = mrOK then begin
+    for i := 0 to Length(FilesToPatch) - 1 do
+      FilesToPatch[i] := not Checks[i].Checked;
+    end;
+  finally
+    PopupForm.Free;
+  end;
+end;
+
+procedure ExtraButtonClick(Sender: TObject);
+begin
+  ShowOptionsPopup;
+end;
+
 procedure InitializeWizard;
 begin
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
@@ -218,23 +289,29 @@ begin
     LangURL + #13#10 +
     ScriptsURL
   );
-  if ParamExists('/FORCESHOWDELTAQUICK') then
-  begin
-    ShowDeltaquickCheckmark := true;
-  end;
-  if (ShowDeltaquickCheckmark = true) then
+  if (ShowDeltaquickCheckmark) or ParamExists('/FORCESHOWDELTAQUICK') then
   begin
     InfoCheckbox := TNewCheckBox.Create(InfoPage);
-      with InfoCheckbox do
-      begin
-        Parent := InfoPage.Surface;
-        Top := InfoPage.SurfaceHeight - Height - 8; 
-        Left := 0;
-        Width := InfoPage.SurfaceWidth;
-        Caption := CustomMessage('DeltaQuick1');
-        Checked := False;
-      end;
+    with InfoCheckbox do
+    begin
+      Parent := InfoPage.Surface;
+      Top := InfoPage.SurfaceHeight - Height - 8; 
+      Left := 0;
+      Width := InfoPage.SurfaceWidth;
+      Caption := CustomMessage('DeltaQuick1');
+      Checked := False;
     end;
+  end;
+
+  ExtraButton := TNewButton.Create(WizardForm);
+  ExtraButton.Parent := WizardForm;
+  ExtraButton.Caption := 'Chose patches...';
+  ExtraButton.Width := ScaleX(100);
+  ExtraButton.Height := WizardForm.NextButton.Height;
+  ExtraButton.Top := WizardForm.NextButton.Top;
+  ExtraButton.Left := WizardForm.BackButton.Left - ExtraButton.Width - ScaleX(10);
+  ExtraButton.OnClick := @ExtraButtonClick;
+  ExtraButton.Visible := False;
 
   GamePathPage := CreateInputDirPage(
     InfoPage.ID,
@@ -264,8 +341,8 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    PatchDeltaQuick := false;
-    if (ShowDeltaquickCheckmark = true) then
+    PatchDeltaQuick := False;
+    if (ShowDeltaquickCheckmark) or ParamExists('/FORCESHOWDELTAQUICK') then
     begin
       PatchDeltaQuick := InfoCheckbox.Checked;
     end;
@@ -432,7 +509,8 @@ end;
 function DownloadAndExtractFiles(): Boolean;
 var
   LangZipPath, ScriptsZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
-  ResultCode: Integer;
+  ResultCode, i: Integer;
+  PatchAll: Boolean;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
@@ -508,6 +586,23 @@ begin
     begin
       ArgString := '';
     end;
+    for i := 0 to Length(FilesToPatch) - 1 do begin
+      if FilesToPatch[i] then
+      begin
+        PatchAll := False;
+        break;
+      end;
+    end;
+    if (not PatchAll) then
+    begin
+      ArgString := ArgString + ' --files '
+      for i := 0 to Length(FilesToPatch) - 1 do begin
+        if not FilesToPatch[i] then
+        begin
+          ArgString := ArgString + 'ch' + IntToStr(i) + ',';
+        end;
+      end;
+    end;
     if Exec(PatcherPath, Format('--game "%s" --scripts "%s"%s', [GamePath, ExpandConstant('{tmp}\scripts'), ArgString]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
       if ResultCode <> 0 then
@@ -557,6 +652,7 @@ begin
     WizardForm.FinishedHeadingLabel.Caption := CustomMessage('FinishedHeadingLabel1');
     WizardForm.FinishedLabel.Caption := FinishedText;
   end;
+  ExtraButton.Visible := (CurPageID = GamePathPage.ID);
 end;
 
 procedure CloseInstaller;

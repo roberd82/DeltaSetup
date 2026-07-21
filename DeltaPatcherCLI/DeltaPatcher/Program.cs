@@ -51,7 +51,7 @@ class Program
                     foreach (var entry in args[++i].Split(","))
                     {
                         var lower = entry.ToLower().Trim();
-                        if (lower is "menu" or "chapter_select" or "selector")
+                        if (lower is "menu" or "chapter_select" or "selector" or "chapter0" or "ch0")
                         {
                             filesToPatch.TryAdd("Menu", droid ? "selector" : "");
                         }
