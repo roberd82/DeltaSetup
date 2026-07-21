@@ -21,6 +21,7 @@ internal class Program
     private static readonly StringBuilder OutputTextBuilder = new();
     private static bool _writeOutputToFile = true;
     private static bool _droid;
+    private static bool _makeBackups;
     private static string DataName => _droid ? "game.droid" : "data.win";
     private static OrderedDictionary<string, string> _filesToPatch;      // key: chapter name, value: path to folder the data file is in relative to gamePath
 
@@ -48,6 +49,9 @@ internal class Program
                         break;
                     case "--droid":
                         _droid = true;
+                        break;
+                    case "--make-backups":
+                        _makeBackups = true;
                         break;
                     case "--files" when i + 1 < args.Length: 
                         _filesToPatch = [];
@@ -123,9 +127,12 @@ internal class Program
                     }
                 }
                 
-                foreach (var file in _filesToPatch) 
-                {
-                    await ApplyChapterPatch(gamePath, scriptsPath, file.Key, file.Value == "" ? DataName : Path.Join(file.Value, DataName));
+                foreach (var file in _filesToPatch) {
+                    var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
+                    if (_makeBackups) {
+                        MakeBackup(gamePath, dataWin);
+                    }
+                    await ApplyChapterPatch(gamePath, scriptsPath, file.Key, dataWin);
                 }
             }
             else {
@@ -191,6 +198,10 @@ internal class Program
                     var fileName = file.Value.Replace(".apk", "").Replace(".pack", "");
                     var jarOutDir = Path.Join(gamePath, fileName);
                     var assetsDir = Path.Join(fileName, "assets");
+                    
+                    if (_makeBackups) {
+                        MakeBackup(gamePath, file.Value);
+                    }
                     
                     RunCommand("java", "-jar " + $"{apktoolPath} d -r \"{Path.Join(gamePath, file.Value)}\" -o \"{jarOutDir}\" -f");
                     await ApplyChapterPatch(gamePath, scriptsPath, file.Key, $"{Path.Join(assetsDir, DataName)}");
@@ -273,6 +284,11 @@ internal class Program
 
         using var process = Process.Start(startInfo);
         process?.WaitForExit();
+    }
+
+    private static void MakeBackup(string path, string file) {
+        var sourcePath = Path.Join(path, file);
+        FileCopyNoRO(sourcePath, sourcePath + ".bak", true);
     }
 
     public static void WriteLine(string line = null, bool onlyToFile = false)
