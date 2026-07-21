@@ -79,10 +79,16 @@ tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of 
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
 tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
+tr.PatchSelectPage1=Select Files to Patch
+tr.PatchSelectPage2=Menu
+tr.PatchSelectPage3=Chapter
+tr.PatchSelectPage4=Only install the selected patches:
+tr.AdvancedButtonText=Advanced
+
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
-Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
+//Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Code]
 const
@@ -91,7 +97,7 @@ const
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
-  ShowDeltaquickCheckmark = True;
+  ShowDeltaquickCheckmark = False;
 var
   InfoPage: TOutputMsgWizardPage;
   GamePathPage: TInputDirWizardPage;
@@ -201,38 +207,51 @@ end;
 procedure ShowOptionsPopup;
 var
   PopupForm: TSetupForm;
+  InfoLabel: TNewStaticText;
   OKButton, CancelButton: TNewButton;
   Checks: array of TNewCheckBox;
   i: Integer;
+  TopOffset: Integer;
 begin
   SetLength(Checks, Length(FilesToPatch));
   PopupForm := CreateCustomForm(ScaleX(260), ScaleY(230), False, False);
   try
-    PopupForm.Caption := 'Select Files to Patch';
+    PopupForm.Caption := CustomMessage('PatchSelectPage1');
     PopupForm.Position := poScreenCenter;
     PopupForm.BorderStyle := bsDialog;
+
+    InfoLabel := TNewStaticText.Create(PopupForm);
+    InfoLabel.Parent := PopupForm;
+    InfoLabel.Left := ScaleX(16);
+    InfoLabel.Top := ScaleY(12);
+    InfoLabel.Width := PopupForm.ClientWidth - ScaleX(32);
+    InfoLabel.AutoSize := False;
+    InfoLabel.WordWrap := True;
+    InfoLabel.Caption := CustomMessage('PatchSelectPage4');
+
+    TopOffset := InfoLabel.Top + InfoLabel.Height;
 
     for i := 0 to Length(FilesToPatch) - 1 do begin
       Checks[i] := TNewCheckBox.Create(PopupForm);
       Checks[i].Parent := PopupForm;
       Checks[i].Left := ScaleX(16);
-      Checks[i].Top := ScaleY(16 + i * 24);
+      Checks[i].Top := TopOffset + ScaleY(16 + i * 24);
       Checks[i].Width := PopupForm.ClientWidth - ScaleX(32);
       Checks[i].Height := ScaleY(20);
       if (i = 0) then
       begin
-        Checks[i].Caption := 'Menu';
+        Checks[i].Caption := CustomMessage('PatchSelectPage2');
       end
       else
       begin
-        Checks[i].Caption := 'Chapter' + IntToStr(i);
+        Checks[i].Caption := CustomMessage('PatchSelectPage3') + IntToStr(i);
       end;
       Checks[i].Checked := not FilesToPatch[i];
     end;
 
     OKButton := TNewButton.Create(PopupForm);
     OKButton.Parent := PopupForm;
-    OKButton.Caption := 'OK';
+    OKButton.Caption := SetupMessage(msgButtonOK);
     OKButton.ModalResult := mrOK;
     OKButton.Default := True;
     OKButton.Width := ScaleX(75);
@@ -242,7 +261,7 @@ begin
 
     CancelButton := TNewButton.Create(PopupForm);
     CancelButton.Parent := PopupForm;
-    CancelButton.Caption := 'Cancel';
+    CancelButton.Caption := SetupMessage(msgButtonCancel);
     CancelButton.ModalResult := mrCancel;
     CancelButton.Cancel := True;
     CancelButton.Width := ScaleX(75);
@@ -305,8 +324,8 @@ begin
 
   ExtraButton := TNewButton.Create(WizardForm);
   ExtraButton.Parent := WizardForm;
-  ExtraButton.Caption := 'Chose patches...';
-  ExtraButton.Width := ScaleX(100);
+  ExtraButton.Caption := CustomMessage('AdvancedButtonText');
+  ExtraButton.Width := ScaleX(80);   // change size here if text doesn't fit
   ExtraButton.Height := WizardForm.NextButton.Height;
   ExtraButton.Top := WizardForm.NextButton.Top;
   ExtraButton.Left := WizardForm.BackButton.Left - ExtraButton.Width - ScaleX(10);
