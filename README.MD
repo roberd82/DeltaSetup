@@ -10,8 +10,6 @@ This is the source code for the DELTARUNE Translation installer by LazyDesman. I
 
 - In the `DeltaPatcherCLI.csproj` change `en` language code to yours.
 
-- Download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `DeltaPatcherCLI.csproj`
-
 - In the `LocalizedText.cs` translate strings from English to your language.
 
 - Then you need to compile it (publish - `dotnet publish -f net10.0 -m:1` or `dotnet publish DeltaPatcherCLI.csproj -c Release -r win-x64 --output win_x64 -m:1` in terminal) (it will be in `DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish/`)
@@ -35,6 +33,11 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
 - In the beginning of the \[Code\] section change `LangURL` and `LangURLMirror` to download links to your translation in a `.7z` archive (in the archive the top folder should be the `lang` folder).
 
 - Optionally, change `ScriptsURL` and `ScriptsURLMirror` to your download links if you want to share them by yourself (and be indepedent from possible updates).
+
+- if you want to support DeltaQuick do these things as well:
+    - Download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `setup.iss`
+    - uncomment the line `Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall`
+    - set `ShowDeltaquickCheckmark` from `false` to `true`
 
 - And finally, compile the installer in Inno Setup.
 

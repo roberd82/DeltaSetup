@@ -83,7 +83,7 @@ tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
-Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
+//Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Code]
 const
@@ -91,8 +91,8 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
-  ShowDeltaquickCheckmark = true;
   DeltaruneExe = 'DELTARUNE.exe';
+  ShowDeltaquickCheckmark = false;
 var
   InfoPage: TOutputMsgWizardPage;
   GamePathPage: TInputDirWizardPage;
@@ -180,6 +180,21 @@ begin
   end;
 end;
 
+function ParamExists(const Value: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(I), Value) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
 procedure InitializeWizard;
 begin
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
@@ -203,15 +218,22 @@ begin
     LangURL + #13#10 +
     ScriptsURL
   );
-  InfoCheckbox := TNewCheckBox.Create(InfoPage);
-    with InfoCheckbox do
-    begin
-      Parent := InfoPage.Surface;
-      Top := InfoPage.SurfaceHeight - Height - 8; 
-      Left := 0;
-      Width := InfoPage.SurfaceWidth;
-      Caption := CustomMessage('DeltaQuick1');
-      Checked := False;
+  if ParamExists('/FORCESHOWDELTAQUICK') then
+  begin
+    ShowDeltaquickCheckmark := true;
+  end;
+  if (ShowDeltaquickCheckmark = true) then
+  begin
+    InfoCheckbox := TNewCheckBox.Create(InfoPage);
+      with InfoCheckbox do
+      begin
+        Parent := InfoPage.Surface;
+        Top := InfoPage.SurfaceHeight - Height - 8; 
+        Left := 0;
+        Width := InfoPage.SurfaceWidth;
+        Caption := CustomMessage('DeltaQuick1');
+        Checked := False;
+      end;
     end;
 
   GamePathPage := CreateInputDirPage(
@@ -242,7 +264,11 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    PatchDeltaQuick := InfoCheckbox.Checked;
+    PatchDeltaQuick := false;
+    if (ShowDeltaquickCheckmark = true) then
+    begin
+      PatchDeltaQuick := InfoCheckbox.Checked;
+    end;
     
     FoundGameLoc := FindGameLocation();
     if (FoundGameLoc = '') and (not PatchDeltaQuick) then

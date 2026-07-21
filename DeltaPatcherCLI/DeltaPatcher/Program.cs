@@ -124,9 +124,10 @@ class Program
                 }
             }
             else {
-                var apktoolPath = Path.GetTempPath() + "apktool.jar";
-                if (!File.Exists(apktoolPath)) {
-                    apktoolPath = $"{AppContext.BaseDirectory}{DirSep}apktool.jar";
+                var apktoolPath = Path.Join(Path.GetTempPath(), "apktool.jar");
+                if (!File.Exists(apktoolPath))
+                {
+                    apktoolPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath)!, "apktool.jar");
                 }
                 
                 var files = new DirectoryInfo(gamePath).GetFiles("selector.apk")
