@@ -82,8 +82,9 @@ tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 tr.PatchSelectPage1=Select Files to Patch
 tr.PatchSelectPage2=Menu
 tr.PatchSelectPage3=Chapter
-tr.PatchSelectPage4=Only install the selected patches (if all is selected, even potentially unlisted files could be patched):
+tr.PatchSelectPage4=Only install the selected patches:
 tr.PatchSelectPage5=Skip downloading language files
+tr.PatchSelectPage6=Back up original files
 tr.AdvancedButtonText=Advanced
 
 [Files]
@@ -113,6 +114,7 @@ var
   ExtraButton: TNewButton;
   FilesToPatch: array[0..5] of Boolean;
   SkipLangFiles: Boolean;
+  MakeBackups: Boolean;
 
 procedure InitExistingDrives;
 var
@@ -211,7 +213,7 @@ var
   InfoLabel: TNewStaticText;
   OKButton, CancelButton: TNewButton;
   Checks: array of TNewCheckBox;
-  SkipLangCheck: TNewCheckBox;
+  SkipLangCheck, MakeBackupsCheck: TNewCheckBox;
   TopOffset, i: Integer;
 begin
   SetLength(Checks, Length(FilesToPatch));
@@ -253,11 +255,20 @@ begin
     SkipLangCheck := TNewCheckBox.Create(PopupForm);
     SkipLangCheck.Parent := PopupForm;
     SkipLangCheck.Left := ScaleX(16);
-    SkipLangCheck.Top := TopOffset + ScaleY(20 + (i + 1) * 24);
+    SkipLangCheck.Top := TopOffset + ScaleY(26 + i * 24);
     SkipLangCheck.Width := PopupForm.ClientWidth - ScaleX(32);
     SkipLangCheck.Height := ScaleY(20);
     SkipLangCheck.Caption := CustomMessage('PatchSelectPage5');
     SkipLangCheck.Checked := SkipLangFiles;
+
+    MakeBackupsCheck := TNewCheckBox.Create(PopupForm);
+    MakeBackupsCheck.Parent := PopupForm;
+    MakeBackupsCheck.Left := ScaleX(16);
+    MakeBackupsCheck.Top := TopOffset + ScaleY(48 + i * 24);
+    MakeBackupsCheck.Width := PopupForm.ClientWidth - ScaleX(32);
+    MakeBackupsCheck.Height := ScaleY(20);
+    MakeBackupsCheck.Caption := CustomMessage('PatchSelectPage6');
+    MakeBackupsCheck.Checked := SkipLangFiles;
 
     OKButton := TNewButton.Create(PopupForm);
     OKButton.Parent := PopupForm;
@@ -283,6 +294,7 @@ begin
 
     if PopupForm.ShowModal() = mrOK then begin
     SkipLangFiles := SkipLangCheck.Checked;
+    MakeBackups := MakeBackupsCheck.Checked;
     for i := 0 to Length(FilesToPatch) - 1 do
       FilesToPatch[i] := not Checks[i].Checked;
     end;
@@ -614,14 +626,19 @@ begin
     
     ProgressPage.SetText(CustomMessage('ProgressPage3d'), '');
     PatcherPath := ExpandConstant('{tmp}\DeltaPatcherCLI.exe');
+
+    ArgString := '';
+
     if PatchDeltaQuick then
     begin
-      ArgString := ' --droid';
-    end
-    else
-    begin
-      ArgString := '';
+      ArgString := ArgString + ' --droid';
     end;
+
+    if MakeBackups then
+    begin
+      ArgString := ArgString + ' --make-backups'
+    end;
+
     for i := 0 to Length(FilesToPatch) - 1 do begin
       if FilesToPatch[i] then
       begin
@@ -629,6 +646,7 @@ begin
         break;
       end;
     end;
+
     if (not PatchAll) then
     begin
       ArgString := ArgString + ' --files '
@@ -639,6 +657,7 @@ begin
         end;
       end;
     end;
+    
     if Exec(PatcherPath, Format('--game "%s" --scripts "%s"%s', [GamePath, ExpandConstant('{tmp}\scripts'), ArgString]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
       if ResultCode <> 0 then
