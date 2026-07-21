@@ -83,6 +83,7 @@ tr.PatchSelectPage1=Select Files to Patch
 tr.PatchSelectPage2=Menu
 tr.PatchSelectPage3=Chapter
 tr.PatchSelectPage4=Only install the selected patches (if all is selected, even potentially unlisted files could be patched):
+tr.PatchSelectPage5=Skip downloading language files
 tr.AdvancedButtonText=Advanced
 
 [Files]
@@ -111,6 +112,7 @@ var
   // expand the array to support more chapters in the future
   ExtraButton: TNewButton;
   FilesToPatch: array[0..5] of Boolean;
+  SkipLangFiles: Boolean;
 
 procedure InitExistingDrives;
 var
@@ -209,8 +211,8 @@ var
   InfoLabel: TNewStaticText;
   OKButton, CancelButton: TNewButton;
   Checks: array of TNewCheckBox;
-  i: Integer;
-  TopOffset: Integer;
+  SkipLangCheck: TNewCheckBox;
+  TopOffset, i: Integer;
 begin
   SetLength(Checks, Length(FilesToPatch));
   PopupForm := CreateCustomForm(ScaleX(260), ScaleY(230), False, False);
@@ -248,6 +250,15 @@ begin
       Checks[i].Checked := not FilesToPatch[i];
     end;
 
+    SkipLangCheck := TNewCheckBox.Create(PopupForm);
+    SkipLangCheck.Parent := PopupForm;
+    SkipLangCheck.Left := ScaleX(16);
+    SkipLangCheck.Top := TopOffset + ScaleY(20 + (i + 1) * 24);
+    SkipLangCheck.Width := PopupForm.ClientWidth - ScaleX(32);
+    SkipLangCheck.Height := ScaleY(20);
+    SkipLangCheck.Caption := CustomMessage('PatchSelectPage5');
+    SkipLangCheck.Checked := SkipLangFiles;
+
     OKButton := TNewButton.Create(PopupForm);
     OKButton.Parent := PopupForm;
     OKButton.Caption := SetupMessage(msgButtonOK);
@@ -271,6 +282,7 @@ begin
     PopupForm.ActiveControl := OKButton;
 
     if PopupForm.ShowModal() = mrOK then begin
+    SkipLangFiles := SkipLangCheck.Checked;
     for i := 0 to Length(FilesToPatch) - 1 do
       FilesToPatch[i] := not Checks[i].Checked;
     end;
@@ -538,20 +550,23 @@ begin
 
   ProgressPage.Show;
   try
-    if FileExists(ExpandConstant('{src}\lang.7z')) then
+    if (not SkipLangFiles) then
     begin
-      if MsgBox(CustomMessage('OfflineQuestion1'), mbConfirmation, MB_YESNO) = IDYES then
+      if FileExists(ExpandConstant('{src}\lang.7z')) then
       begin
-        CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False);
+        if MsgBox(CustomMessage('OfflineQuestion1'), mbConfirmation, MB_YESNO) = IDYES then
+        begin
+          CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False);
+        end
+        else
+        begin
+          DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror1'), LangURL, LangURLMirror, 'lang.7z');
+        end;
       end
       else
       begin
         DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror1'), LangURL, LangURLMirror, 'lang.7z');
       end;
-    end
-    else
-    begin
-      DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror1'), LangURL, LangURLMirror, 'lang.7z');
     end;
 
     if FileExists(ExpandConstant('{src}\scripts.7z')) then
@@ -588,8 +603,11 @@ begin
     ProgressPage.SetText(CustomMessage('ProgressPage3a'), '');
     ExtractArchive(PatcherZipPath, ExpandConstant('{tmp}'));
 
-    ProgressPage.SetText(CustomMessage('ProgressPage3b'), '');
-    ExtractArchive(LangZipPath, GamePath);
+    if (not SkipLangFiles) then
+    begin
+      ProgressPage.SetText(CustomMessage('ProgressPage3b'), '');
+      ExtractArchive(LangZipPath, GamePath);
+    end;
 
     ProgressPage.SetText(CustomMessage('ProgressPage3c'), '');
     ExtractArchive(ScriptsZipPath, ExpandConstant('{tmp}\scripts'));
