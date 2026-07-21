@@ -1,5 +1,5 @@
 ﻿namespace DeltaPatcherCLI {
-    internal class LocalizedText {
+    internal static class LocalizedText {
         public const string CriticalError1 	    = "CRITICAL ERROR:";
         public const string ErrorLog1 	        = "Error details and installer log are saved to the file:";
         public const string ErrorLog2 	        = "Failed to write installer log to file";
