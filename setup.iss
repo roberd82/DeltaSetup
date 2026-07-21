@@ -63,8 +63,7 @@ tr.ExceptionMsg2b=If the game folder has the "Read-only" attribute, then remove 
 tr.RaiseException1=Archive file not found, path - 
 tr.DownloadToTempWithMirror1=Downloading language files...
 tr.DownloadToTempWithMirror2=Downloading scripts...
-tr.DownloadToTempWithMirror3=Downloading apktool...
-tr.DownloadToTempWithMirror4=An error occurred while downloading files: 
+tr.DownloadToTempWithMirror3=An error occurred while downloading files: 
 tr.ProgressPage3a=Unpacking the patcher...
 tr.ProgressPage3b=Unpacking language files...
 tr.ProgressPage3c=Unpacking scripts...
@@ -77,13 +76,14 @@ tr.FinishedText3b=Click «Finish» to exit the setup program.
 tr.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translation
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
-tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of downloading it?
+tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of the bundled version?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
 tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Code]
 const
@@ -91,7 +91,7 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
-  
+  ShowDeltaquickCheckmark = true;
   DeltaruneExe = 'DELTARUNE.exe';
 var
   InfoPage: TOutputMsgWizardPage;
@@ -297,30 +297,6 @@ begin
   end;
 end;
 
-function GetLatestReleaseUrl(const LatestEnpoint: String): String;
-var
-  WinHttpReq: Variant;
-  Response: String;
-  p, p2: Integer;
-  Key: String;
-begin
-  Result := '';
-  WinHttpReq := CreateOleObject('WinHttp.WinHttpRequest.5.1');
-  WinHttpReq.Open('GET', LatestEnpoint, False);
-  WinHttpReq.SetRequestHeader('User-Agent', 'Inno-Setup-Installer');
-  WinHttpReq.Send('');
-  Response := WinHttpReq.ResponseText;
-
-  Key := '"browser_download_url":"';
-  p := Pos(Key, Response);
-  if p > 0 then
-  begin
-    p := p + Length(Key);
-    p2 := Pos('"', Copy(Response, p, Length(Response)));
-    Result := Copy(Response, p, p2 - 1);
-  end;
-end;
-
 function HandlePatcherError(GamePath: String): Boolean;
 var
   LogPath, LogText, FirstLogLine: String;
@@ -429,13 +405,12 @@ end;
 
 function DownloadAndExtractFiles(): Boolean;
 var
-  LangZipPath, ScriptsZipPath, ApktoolPath, ApktoolUrl, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
+  LangZipPath, ScriptsZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
   ResultCode: Integer;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
   ApktoolPath := ExpandConstant('{tmp}\apktool.jar');
-  ApktoolUrl := GetLatestReleaseUrl('https://api.github.com/repos/iBotPeaches/Apktool/releases/latest');
   PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
 
@@ -478,19 +453,11 @@ begin
       if MsgBox(CustomMessage('OfflineQuestion3'), mbConfirmation, MB_YESNO) = IDYES then
       begin
         CopyFile(ExpandConstant('{src}\apktool.jar'), ApktoolPath, False);
-      end
-      else
-      begin
-        DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolUrl, ApktoolUrl, 'apktool.jar');
       end;
-    end
-    else
-    begin
-      DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror3'), ApktoolUrl, ApktoolUrl, 'apktool.jar');
     end;
 
   except
-    MsgBox(CustomMessage('DownloadToTempWithMirror4') + GetExceptionMessage(), mbError, MB_OK);
+    MsgBox(CustomMessage('DownloadToTempWithMirror3') + GetExceptionMessage(), mbError, MB_OK);
     Result := False;
     Exit;
   end;

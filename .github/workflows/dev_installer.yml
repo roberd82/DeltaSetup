@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 env:
-  CSPROJ_DIR: DeltaPatcherCLI/DeltaPatcher
+  APKTOOL_REPO: iBotPeaches/Apktool
   SOLUTION_PATH: DeltaPatcherCLI/DeltaPatcherCLI.sln
   PUBLISH_DIR: DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish
   EXE_NAME: DeltaPatcherCLI.exe
@@ -28,6 +28,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Get latest apktool release and rename jar
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download --repo $env:APKTOOL_REPO --pattern "*.jar" --dir apktool-dl --clobber
+          $jar = Get-ChildItem apktool-dl -Filter *.jar | Select-Object -First 1
+          Copy-Item $jar.FullName "$env:ISS_DIR/apktool.jar" -Force
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
