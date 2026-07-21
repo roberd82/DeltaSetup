@@ -12,7 +12,6 @@ permissions:
 
 env:
   APKTOOL_REPO: iBotPeaches/Apktool
-  CSPROJ_DIR: DeltaPatcherCLI/DeltaPatcher
   SOLUTION_PATH: DeltaPatcherCLI/DeltaPatcherCLI.sln
   PUBLISH_DIR: DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish
   EXE_NAME: DeltaPatcherCLI.exe
@@ -37,7 +36,7 @@ jobs:
         run: |
           gh release download --repo $env:APKTOOL_REPO --pattern "*.jar" --dir apktool-dl --clobber
           $jar = Get-ChildItem apktool-dl -Filter *.jar | Select-Object -First 1
-          Copy-Item $jar.FullName "$env:CSPROJ_DIR/apktool.jar" -Force
+          Copy-Item $jar.FullName "$env:ISS_DIR/apktool.jar" -Force
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

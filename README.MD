@@ -4,21 +4,19 @@ This is the source code for the DELTARUNE Translation installer by LazyDesman. I
 
 # How to build it?
 
-(The pre-built version in the Releases tab automatically gets recompiled on every update. It installs the mod, and downloads the English localization files. This is provided, so translation developers can install the mod if they haven't made their own installers already. ATTENTION: THE LANG FOLDER IN IN THE GAME FILES WILL BE OVERRIDDEN DURING INSTALL, BE CAREFUL TO NOT LOSE ANY DATA!)
+(The pre-built version in the Releases tab automatically gets recompiled on every update. It installs the mod, and downloads the English localization files. This is provided, so translation developers can install the mod if they haven't made their own installers already. ATTENTION: THE LANG FOLDER IN THE GAME FILES WILL BE OVERRIDDEN DURING INSTALL, BE CAREFUL TO NOT LOSE ANY DATA!)
 
 - First, download this repo and open `DeltaPatcherCLI.csproj` and `LocalizedText.cs` in Visual Studio or any other text editor.
 
 - In the `DeltaPatcherCLI.csproj` change `en` language code to yours.
 
-- Download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `DeltaPatcherCLI.csproj`
-
 - In the `LocalizedText.cs` translate strings from English to your language.
 
-- Then you need to compile it (publish - `dotnet publish -f net10.0 -m:1` or `dotnet publish DeltaPatcherCLI.csproj -c Release -r win-x64 --output win_x64 -m:1` in terminal) (it will be in `DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish/`)
+- Then you need to compile it (publish - `dotnet publish -f net10.0 -m:1` or `dotnet publish DeltaPatcherCLI.csproj -c Release -r win-x64 -m:1` in terminal) (it will be in `DeltaPatcherCLI/DeltaPatcher/bin/Release/net10.0/win-x64/publish/`)
 
 - Next, you need to put DeltaPatcherCLI in a 7zip archive and name it `DeltaPatcherCLI.7z`, then put it next to the `setup.iss` file.
 
-IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
+IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER!
 
 - Then you need to install [Inno Setup](https://jrsoftware.org/isinfo.php)
 
@@ -36,17 +34,22 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER
 
 - Optionally, change `ScriptsURL` and `ScriptsURLMirror` to your download links if you want to share them by yourself (and be indepedent from possible updates).
 
+- if you want the installer to support DeltaQuick do these things as well:
+    - Download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `setup.iss`
+    - uncomment the line `Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall` in the \[Files\] section
+    - set `ShowDeltaquickCheckmark` from `false` to `true` in the beginning of the \[Code\] section
+
 - And finally, compile the installer in Inno Setup.
 
 - Done, you've built your DELTARUNE translation installer!
 
 # Installing without Internet connection
 
-If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection.
+If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection. (You can also override the bundled (or missing) `apktool.jar` the same way.)
 
 # Installing to DeltaQuick
 
-IMPORTANT! YOU HAVE THO HAVE [JAVA JRE](https://adoptium.net/temurin/releases) INSTALLED AND IN YOUR PATH
+IMPORTANT! YOU HAVE THO HAVE [JAVA JRE](https://adoptium.net/temurin/releases) INSTALLED AND IN YOUR PATH!
 
 The translation mod gets applied on-top of the DeltaQuick patches, so you first need to get those.
 - Download [DeltaQuick](https://play.google.com/store/apps/details?id=com.bookerpuzzle.deltaquick&pcampaignid=web_share), and follow the instructions for it

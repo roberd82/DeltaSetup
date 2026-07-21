@@ -1,5 +1,5 @@
 ﻿namespace DeltaPatcherCLI {
-    internal class LocalizedText {
+    internal static class LocalizedText {
         public const string CriticalError1 	    = "CRITICAL ERROR:";
         public const string ErrorLog1 	        = "Error details and installer log are saved to the file:";
         public const string ErrorLog2 	        = "Failed to write installer log to file";
@@ -11,8 +11,8 @@
         public const string ReadonlyWarningFile = "Warning - unable to check for (or remove) the \"Read-only\" attribute on the file";
         public const string ReadonlyWarningDir  = "Warning - unable to check for (or remove) the \"Read-only\" attribute on the directory or its file(s)";
         public const string ScriptError1 	    = "Script error:";
-        public const string Usage1 	            = "Usage:";
-        public const string Usage2 	            = "DeltarunePatcherCLI.exe --game \"path_to_the_game\" --scripts \"path_to_scripts\"";
+        public const string Usage1 	            = "Usage (--files is optional, if present only the specified files are patched):";
+        public const string Usage2 	            = "DeltarunePatcherCLI.exe --game \"path_to_the_game\" --scripts \"path_to_scripts\" --files menu,ch1,chapter5";
         public const string Usage3 	            = "Example:";
         public const string ValidatePath1 	    = "Checking paths...";
         public const string Version1 	        = "Version {0}";

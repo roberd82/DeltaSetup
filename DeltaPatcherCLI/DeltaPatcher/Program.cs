@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime;
 using System.Runtime.InteropServices;
@@ -11,21 +12,22 @@ using UndertaleModLib.Scripting;
 
 namespace DeltaPatcherCLI;
 
-class Program
+internal class Program
 {
     public static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-    public static readonly char DirSep = Path.DirectorySeparatorChar;
 
-    private static ScriptOptions scriptOptions;
-    private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
-    private static readonly StringBuilder outputTextBuilder = new();
-    private static bool writeOutputToFile = true;
-    private static bool droid = false;
+    private static ScriptOptions _scriptOptions;
+    private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
+    private static readonly StringBuilder OutputTextBuilder = new();
+    private static bool _writeOutputToFile = true;
+    private static bool _droid;
+    private static string DataName => _droid ? "game.droid" : "data.win";
+    private static OrderedDictionary<string, string> _filesToPatch;      // key: chapter name, value: path to folder the data file is in relative to gamePath
 
     private static async Task Main(string[] args)
     {
-        string gamePath = "";
-        string scriptsPath = "";
+        var gamePath = "";
+        var scriptsPath = "";
 
         try
         {
@@ -34,14 +36,36 @@ class Program
             WriteLine(LocalizedText.DevelopedBy1);
             WriteLine("-----------------------------------");
 
-            for (int i = 0; i < args.Length; i++)
+            for (var i = 0; i < args.Length; i++)
             {
-                if (args[i] == "--game" && i + 1 < args.Length)
-                    gamePath = args[++i];
-                else if (args[i] == "--scripts" && i + 1 < args.Length)
-                    scriptsPath = args[++i];
-                else if (args[i] == "--droid")
-                    droid = true;
+                switch (args[i])
+                {
+                    case "--game" when i + 1 < args.Length:
+                        gamePath = args[++i];
+                        break;
+                    case "--scripts" when i + 1 < args.Length:
+                        scriptsPath = args[++i];
+                        break;
+                    case "--droid":
+                        _droid = true;
+                        break;
+                    case "--files" when i + 1 < args.Length: 
+                        _filesToPatch = [];
+                        foreach (var entry in args[++i].Split(","))
+                        {
+                            var lower = entry.ToLower().Trim();
+                            if (lower is "menu" or "chapter_select" or "selector" or "chapter0" or "ch0")
+                            {
+                                _filesToPatch.TryAdd("Menu", _droid ? "selector" : "");
+                            }
+                            else if ((lower.StartsWith("chapter") || lower.StartsWith("ch")) && char.IsDigit(lower[^1]))
+                            {
+                                var chNum = lower[^1];
+                                _filesToPatch.TryAdd($"Chapter{chNum}", $"chapter{chNum}_windows");
+                            }
+                        }
+                        break;
+                }
             }
 
             if (string.IsNullOrEmpty(gamePath) || string.IsNullOrEmpty(scriptsPath))
@@ -51,10 +75,9 @@ class Program
                 WriteLine();
                 WriteLine(LocalizedText.Usage3);
 
-                if (IsWindows)
-                    WriteLine($"DeltarunePatcherCLI.exe --game \"C:\\Games\\DELTARUNE\" --scripts \"C:\\Temp\\scripts\"");
-                else
-                    WriteLine($"DeltarunePatcherCLI --game \"/home/User/Games/DELTARUNE\" --scripts \"/home/User/Temp/scripts\"");
+                WriteLine(IsWindows
+                    ? "DeltarunePatcherCLI.exe --game \"C:\\Games\\DELTARUNE\" --scripts \"C:\\Temp\\scripts\""
+                    : "DeltarunePatcherCLI --game \"/home/User/Games/DELTARUNE\" --scripts \"/home/User/Temp/scripts\"");
 
                 Environment.Exit(0);
             }
@@ -65,7 +88,7 @@ class Program
                 Environment.Exit(1);
             }
 
-            scriptOptions = ScriptOptions.Default
+            _scriptOptions = ScriptOptions.Default
                             .AddImports("UndertaleModLib", "UndertaleModLib.Models",
                                         "UndertaleModLib.Compiler", "UndertaleModLib.Decompiler",
                                         "System", "System.IO", "System.Collections.Generic",
@@ -78,58 +101,100 @@ class Program
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(false);
 
-            if (!droid)
+            if (!_droid)
             {
-                await ApplyChapterPatch(gamePath, scriptsPath, "Menu", "data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"chapter1_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"chapter2_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"chapter3_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"chapter4_windows{DirSep}data.win");
-                await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"chapter5_windows{DirSep}data.win");
-            }
-            else
-            {
-                Apk.ExtractEmbeddedJar("apktool.jar");
+                if (_filesToPatch is null)
+                {
+                    // if it's null, that means the user didn't specify anything with --files, so patch every available file
+                    _filesToPatch = [];
+                    if (File.Exists(Path.Join(gamePath, DataName)))
+                    {
+                        _filesToPatch.TryAdd("Menu", "");
+                    }
 
-                string translatedPath = $"{gamePath}{DirSep}translated";
+                    foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_windows"))
+                    {
+                        if (!File.Exists(Path.Join(dir, DataName)))
+                        {
+                            continue;
+                        }
+                        var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
+                        _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_windows", ""), dirName);
+                    }
+                }
+                
+                foreach (var file in _filesToPatch) 
+                {
+                    await ApplyChapterPatch(gamePath, scriptsPath, file.Key, file.Value == "" ? DataName : Path.Join(file.Value, DataName));
+                }
+            }
+            else {
+                var apktoolPath = Path.Join(Path.GetTempPath(), "apktool.jar");
+                if (!File.Exists(apktoolPath))
+                {
+                    apktoolPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath)!, "apktool.jar");
+                }
+                
+                var files = new DirectoryInfo(gamePath).GetFiles("selector.apk")
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("selector.pack"))
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.apk"))
+                    .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.pack"))
+                    .ToArray();
+
+                if (_filesToPatch is null)
+                {
+                    _filesToPatch = [];
+                    foreach (var file in files)
+                    {
+                        var split = file.Name.Split(".");
+                        _filesToPatch.TryAdd(
+                            split[0] == "selector"
+                                ? "Menu"
+                                : split[0].Replace("chapter", "Chapter").Replace("_windows", ""),
+                            file.Name);
+                    }
+                }
+                else
+                {
+                    // check if selected files actually exist and add file extensions
+                    for (var i = _filesToPatch.Count - 1; i >= 0; i--)
+                    {
+                        var key = _filesToPatch.GetAt(i).Key;
+                        var match = false;
+                        foreach (var file in files)
+                        {
+                            var split = file.Name.Split(".");
+                            if (_filesToPatch[key] != split[0])
+                            {
+                                continue;
+                            }
+                            _filesToPatch[key] += $".{split[1]}";
+                            match = true;
+                            break;
+                        }
+
+                        if (!match)
+                        {
+                            _filesToPatch.RemoveAt(i);
+                        }
+                    }
+                }
+                
+                var translatedPath = Path.Join(gamePath, "translated");
                 if (!Directory.Exists(translatedPath))
                 {
                     Directory.CreateDirectory(translatedPath);
                 }
-
-                FileInfo[] files = new DirectoryInfo(gamePath).GetFiles("*.apk")
-                    .Concat(new DirectoryInfo(gamePath).GetFiles("*.pack"))
-                    .ToArray();
-                foreach (FileInfo file in files)
+                
+                foreach (var file in _filesToPatch)
                 {
-                    string fileName = file.Name.Replace(".apk", "").Replace(".pack", "");
-                    string jarOutDir = $"{gamePath}{DirSep}{fileName}";
-                    string assetsDir = $"{fileName}{DirSep}assets";
-
-                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar d -r \"{file.FullName}\" -o \"{jarOutDir}\" -f");
-                    switch (fileName)
-                    {
-                        case "selector":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Menu", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter1_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter1", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter2_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter2", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter3_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter3", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter4_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter4", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                        case "chapter5_windows":
-                            await ApplyChapterPatch(gamePath, scriptsPath, "Chapter5", $"{assetsDir}{DirSep}game.droid");
-                            break;
-                    }
-
-                    Apk.RunCommand("java", "-jar " + Path.GetTempPath() + $"apktool.jar b \"{jarOutDir}\" -o \"{translatedPath}{DirSep}{file.Name}\"");
+                    var fileName = file.Value.Replace(".apk", "").Replace(".pack", "");
+                    var jarOutDir = Path.Join(gamePath, fileName);
+                    var assetsDir = Path.Join(fileName, "assets");
+                    
+                    RunCommand("java", "-jar " + $"{apktoolPath} d -r \"{Path.Join(gamePath, file.Value)}\" -o \"{jarOutDir}\" -f");
+                    await ApplyChapterPatch(gamePath, scriptsPath, file.Key, $"{Path.Join(assetsDir, DataName)}");
+                    RunCommand("java", "-jar " + $"{apktoolPath} b \"{jarOutDir}\" -o \"{Path.Join(translatedPath, file.Value)}\"");
 
                     // Theoretically, it shouldn't be read-only, because it was created by "apktool"
                     DeleteDirectoryNoRO(jarOutDir, true);
@@ -168,18 +233,16 @@ class Program
             }
 
 
-            writeOutputToFile = false;
+            _writeOutputToFile = false;
 
-            string logPath = Path.Combine(gamePath, "deltapatcher-log.txt");
+            var logPath = Path.Combine(gamePath, "deltapatcher-log.txt");
             try
             {
-                string logText;
-                if (ex is ScriptException)
-                    logText = $"{ex.Message}\n\n\n{outputTextBuilder}";
-                else
-                    logText = $"{ex}\n\n\n{outputTextBuilder}";
+                var logText = ex is ScriptException
+                    ? $"{ex.Message}\n\n\n{OutputTextBuilder}"
+                    : $"{ex}\n\n\n{OutputTextBuilder}";
 
-                File.WriteAllText(logPath, logText, Encoding.UTF8);
+                await File.WriteAllTextAsync(logPath, logText, Encoding.UTF8);
 
                 WriteLine("-----------------------------------");
                 WriteLine($"{LocalizedText.ErrorLog1} \"{logPath}\".");
@@ -196,13 +259,28 @@ class Program
             Environment.Exit(2);
         }
     }
+    
+    private static void RunCommand(string fileName, string arguments)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = Process.Start(startInfo);
+        process?.WaitForExit();
+    }
 
     public static void WriteLine(string line = null, bool onlyToFile = false)
     {
         if (!onlyToFile)
             Console.WriteLine(line);
-        if (writeOutputToFile)
-            outputTextBuilder.AppendLine(line);
+        if (_writeOutputToFile)
+            OutputTextBuilder.AppendLine(line);
     }
 
     private static void RemoveReadOnlyAttr(string path, bool isDirectory = false)
@@ -235,7 +313,7 @@ class Program
             if (dirInfo.Attributes.HasFlag(FileAttributes.ReadOnly))
                 dirInfo.Attributes &= ~FileAttributes.ReadOnly;
 
-            foreach (FileInfo file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
+            foreach (var file in dirInfo.GetFiles("*", SearchOption.AllDirectories))
             {
                 if (file.IsReadOnly)
                     file.IsReadOnly = false;
@@ -282,7 +360,7 @@ class Program
                 return false;
             }
 
-            if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")) && !droid)
+            if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")) && !_droid)
             {
                 WriteLine(LocalizedText.ValidatePath6);
                 return false;
@@ -302,8 +380,8 @@ class Program
     {
         try
         {
-            string dataWinPath = Path.Combine(gamePath, dataWin);
-            string scriptPath = Path.Combine(scriptsPath, chapter, "Fix.csx");
+            var dataWinPath = Path.Combine(gamePath, dataWin);
+            var scriptPath = Path.Combine(scriptsPath, chapter, "Fix.csx");
 
             WriteLine();
             WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
@@ -323,14 +401,14 @@ class Program
             WriteLine(LocalizedText.ApplyPatch6);
             
             UndertaleData data;
-            using (var fileStream = File.OpenRead(dataWinPath))
+            await using (var fileStream = File.OpenRead(dataWinPath))
             {
                 data = UndertaleIO.Read(fileStream);
             }
 
             WriteLine(LocalizedText.ApplyPatch7);
             
-            var script = File.ReadAllText(scriptPath);
+            var script = await File.ReadAllTextAsync(scriptPath);
 
             ScriptGlobals scriptGlobals = new()
             {
@@ -356,11 +434,11 @@ class Program
 
             SourceFileResolver srcResolver = new(searchPaths: ImmutableArray<string>.Empty,
                                                  baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
-            await CSharpScript.RunAsync(script, scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
+            await CSharpScript.RunAsync(script, _scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
 
             WriteLine(LocalizedText.ApplyPatch8);
 
-            using (var fileStream = FileCreateNoRO(dataWinPath))
+            await using (var fileStream = FileCreateNoRO(dataWinPath))
             {
                 UndertaleIO.Write(fileStream, data);
             }
@@ -418,7 +496,7 @@ public class ScriptGlobals
     {
         if (!dummy)
         {
-            string text = $"[{LocalizedText.Error1}] {message}";
+            var text = $"[{LocalizedText.Error1}] {message}";
             Program.WriteLine(text, onlyToFile: true);
 
             Console.Error.WriteLine(text);

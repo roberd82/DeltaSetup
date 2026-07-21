@@ -28,7 +28,6 @@ Name: "tr"; MessagesFile: "compiler:Default.isl"
 tr.ExitSetupMessage=The installation is not complete. If you exit, the translation will not be installed.%n%nYou can complete the installation by running the setup program later.%n%nDo you want to exit the setup program?
 
 [CustomMessages]
-
 tr.WelcomeLabel1=Welcome to the (your lang) DELTRANSLATE installation wizard
 tr.WelcomeLabel2=This wizard will install the (put your lang or something like that) translation for DELTARUNE.
 tr.wpWelcome1=Installation Description
@@ -76,12 +75,19 @@ tr.FinishedText3b=Click «Finish» to exit the setup program.
 tr.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translation
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
+tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of the bundled version?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
 tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
+tr.PatchSelectPage1=Select Files to Patch
+tr.PatchSelectPage2=Menu
+tr.PatchSelectPage3=Chapter
+tr.PatchSelectPage4=Only install the selected patches (if all is selected, even potentially unlisted files could be patched):
+tr.AdvancedButtonText=Advanced
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
+//Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Code]
 const
@@ -89,8 +95,8 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
-  
   DeltaruneExe = 'DELTARUNE.exe';
+  ShowDeltaquickCheckmark = False;
 var
   InfoPage: TOutputMsgWizardPage;
   GamePathPage: TInputDirWizardPage;
@@ -102,6 +108,9 @@ var
   // a drop-down would be better, but this is fine for now
   InfoCheckbox: TNewCheckBox;
   PatchDeltaQuick: Boolean;
+  // expand the array to support more chapters in the future
+  ExtraButton: TNewButton;
+  FilesToPatch: array[0..5] of Boolean;
 
 procedure InitExistingDrives;
 var
@@ -178,6 +187,103 @@ begin
   end;
 end;
 
+function ParamExists(const Value: string): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(I), Value) = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+// would be better to use the [Components] page, but this work too
+procedure ShowOptionsPopup;
+var
+  PopupForm: TSetupForm;
+  InfoLabel: TNewStaticText;
+  OKButton, CancelButton: TNewButton;
+  Checks: array of TNewCheckBox;
+  i: Integer;
+  TopOffset: Integer;
+begin
+  SetLength(Checks, Length(FilesToPatch));
+  PopupForm := CreateCustomForm(ScaleX(260), ScaleY(230), False, False);
+  try
+    PopupForm.Caption := CustomMessage('PatchSelectPage1');
+    PopupForm.Position := poScreenCenter;
+    PopupForm.BorderStyle := bsDialog;
+
+    InfoLabel := TNewStaticText.Create(PopupForm);
+    InfoLabel.Parent := PopupForm;
+    InfoLabel.Left := ScaleX(16);
+    InfoLabel.Top := ScaleY(12);
+    InfoLabel.Width := PopupForm.ClientWidth - ScaleX(32);
+    InfoLabel.AutoSize := False;
+    InfoLabel.WordWrap := True;
+    InfoLabel.Caption := CustomMessage('PatchSelectPage4');
+
+    TopOffset := InfoLabel.Top + InfoLabel.Height;
+
+    for i := 0 to Length(FilesToPatch) - 1 do begin
+      Checks[i] := TNewCheckBox.Create(PopupForm);
+      Checks[i].Parent := PopupForm;
+      Checks[i].Left := ScaleX(16);
+      Checks[i].Top := TopOffset + ScaleY(16 + i * 24);
+      Checks[i].Width := PopupForm.ClientWidth - ScaleX(32);
+      Checks[i].Height := ScaleY(20);
+      if (i = 0) then
+      begin
+        Checks[i].Caption := CustomMessage('PatchSelectPage2');
+      end
+      else
+      begin
+        Checks[i].Caption := CustomMessage('PatchSelectPage3') + IntToStr(i);
+      end;
+      Checks[i].Checked := not FilesToPatch[i];
+    end;
+
+    OKButton := TNewButton.Create(PopupForm);
+    OKButton.Parent := PopupForm;
+    OKButton.Caption := SetupMessage(msgButtonOK);
+    OKButton.ModalResult := mrOK;
+    OKButton.Default := True;
+    OKButton.Width := ScaleX(75);
+    OKButton.Height := ScaleY(23);
+    OKButton.Top := PopupForm.ClientHeight - ScaleY(31);
+    OKButton.Left := PopupForm.ClientWidth - ScaleX(166);
+
+    CancelButton := TNewButton.Create(PopupForm);
+    CancelButton.Parent := PopupForm;
+    CancelButton.Caption := SetupMessage(msgButtonCancel);
+    CancelButton.ModalResult := mrCancel;
+    CancelButton.Cancel := True;
+    CancelButton.Width := ScaleX(75);
+    CancelButton.Height := ScaleY(23);
+    CancelButton.Top := OKButton.Top;
+    CancelButton.Left := PopupForm.ClientWidth - ScaleX(85);
+
+    PopupForm.ActiveControl := OKButton;
+
+    if PopupForm.ShowModal() = mrOK then begin
+    for i := 0 to Length(FilesToPatch) - 1 do
+      FilesToPatch[i] := not Checks[i].Checked;
+    end;
+  finally
+    PopupForm.Free;
+  end;
+end;
+
+procedure ExtraButtonClick(Sender: TObject);
+begin
+  ShowOptionsPopup;
+end;
+
 procedure InitializeWizard;
 begin
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
@@ -201,7 +307,9 @@ begin
     LangURL + #13#10 +
     ScriptsURL
   );
-  InfoCheckbox := TNewCheckBox.Create(InfoPage);
+  if (ShowDeltaquickCheckmark) or ParamExists('/FORCESHOWDELTAQUICK') then
+  begin
+    InfoCheckbox := TNewCheckBox.Create(InfoPage);
     with InfoCheckbox do
     begin
       Parent := InfoPage.Surface;
@@ -211,6 +319,17 @@ begin
       Caption := CustomMessage('DeltaQuick1');
       Checked := False;
     end;
+  end;
+
+  ExtraButton := TNewButton.Create(WizardForm);
+  ExtraButton.Parent := WizardForm;
+  ExtraButton.Caption := CustomMessage('AdvancedButtonText');
+  ExtraButton.Width := ScaleX(80);   // change size here if text doesn't fit
+  ExtraButton.Height := WizardForm.NextButton.Height;
+  ExtraButton.Top := WizardForm.NextButton.Top;
+  ExtraButton.Left := WizardForm.BackButton.Left - ExtraButton.Width - ScaleX(10);
+  ExtraButton.OnClick := @ExtraButtonClick;
+  ExtraButton.Visible := False;
 
   GamePathPage := CreateInputDirPage(
     InfoPage.ID,
@@ -240,7 +359,11 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    PatchDeltaQuick := InfoCheckbox.Checked;
+    PatchDeltaQuick := False;
+    if (ShowDeltaquickCheckmark) or ParamExists('/FORCESHOWDELTAQUICK') then
+    begin
+      PatchDeltaQuick := InfoCheckbox.Checked;
+    end;
     
     FoundGameLoc := FindGameLocation();
     if (FoundGameLoc = '') and (not PatchDeltaQuick) then
@@ -403,11 +526,13 @@ end;
 
 function DownloadAndExtractFiles(): Boolean;
 var
-  LangZipPath, ScriptsZipPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
-  ResultCode: Integer;
+  LangZipPath, ScriptsZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
+  ResultCode, i: Integer;
+  PatchAll: Boolean;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
+  ApktoolPath := ExpandConstant('{tmp}\apktool.jar');
   PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
 
@@ -417,7 +542,7 @@ begin
     begin
       if MsgBox(CustomMessage('OfflineQuestion1'), mbConfirmation, MB_YESNO) = IDYES then
       begin
-        CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False)
+        CopyFile(ExpandConstant('{src}\lang.7z'), LangZipPath, False);
       end
       else
       begin
@@ -444,6 +569,15 @@ begin
     begin
       DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror2'), ScriptsURL, ScriptsURLMirror, 'scripts.7z');
     end;
+
+    if FileExists(ExpandConstant('{src}\apktool.jar')) then
+    begin
+      if MsgBox(CustomMessage('OfflineQuestion3'), mbConfirmation, MB_YESNO) = IDYES then
+      begin
+        CopyFile(ExpandConstant('{src}\apktool.jar'), ApktoolPath, False);
+      end;
+    end;
+
   except
     MsgBox(CustomMessage('DownloadToTempWithMirror3') + GetExceptionMessage(), mbError, MB_OK);
     Result := False;
@@ -469,6 +603,23 @@ begin
     else
     begin
       ArgString := '';
+    end;
+    for i := 0 to Length(FilesToPatch) - 1 do begin
+      if FilesToPatch[i] then
+      begin
+        PatchAll := False;
+        break;
+      end;
+    end;
+    if (not PatchAll) then
+    begin
+      ArgString := ArgString + ' --files '
+      for i := 0 to Length(FilesToPatch) - 1 do begin
+        if not FilesToPatch[i] then
+        begin
+          ArgString := ArgString + 'ch' + IntToStr(i) + ',';
+        end;
+      end;
     end;
     if Exec(PatcherPath, Format('--game "%s" --scripts "%s"%s', [GamePath, ExpandConstant('{tmp}\scripts'), ArgString]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
@@ -519,6 +670,7 @@ begin
     WizardForm.FinishedHeadingLabel.Caption := CustomMessage('FinishedHeadingLabel1');
     WizardForm.FinishedLabel.Caption := FinishedText;
   end;
+  ExtraButton.Visible := (CurPageID = GamePathPage.ID);
 end;
 
 procedure CloseInstaller;
