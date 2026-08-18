@@ -50,6 +50,13 @@
     <Exec Command="del /F /Q $(PublishDir)UndertaleModLib.xml" IgnoreExitCode="true" />
   </Target>
 
+  <ItemGroup>
+    <EmbeddedResource Include="apktool.yml" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="AndroidManifest.xml" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TrimMode>copyused</TrimMode>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>

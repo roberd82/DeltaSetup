@@ -34,7 +34,7 @@ internal class Program
     {
         DataWinMode.Windows => "data.win",
         DataWinMode.Mac => "game.ios", // < common on macOS, iOS and tvOS runners
-        DataWinMode.Droid => "game.droid",
+        DataWinMode.Droid => "data.win",
         DataWinMode.Console => "game.win", // < common on Switch, PS4, PS5 and Xbox GDK runners
         _ => throw new InvalidOperationException("DataWinMode value is out of range")
     };
@@ -86,7 +86,7 @@ internal class Program
                             var lower = entry.ToLower().Trim();
                             if (lower is "menu" or "chapter_select" or "selector" or "chapter0" or "ch0")
                             {
-                                _filesToPatch.TryAdd("Menu", (_winMode == DataWinMode.Droid) ? "selector" : "");
+                                _filesToPatch.TryAdd("Menu", _winMode == DataWinMode.Droid ? "selector" : "");
                             }
                             else if ((lower.StartsWith("chapter") || lower.StartsWith("ch")) && char.IsDigit(lower[^1]))
                             {
@@ -137,79 +137,65 @@ internal class Program
                 {
                     var apktoolPath = Path.Join(Path.GetTempPath(), "apktool.jar");
                     if (!File.Exists(apktoolPath))
-                    {
+                        // check besides executable if not in temp directory
                         apktoolPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath)!, "apktool.jar");
-                    }
 
-                    var files = new DirectoryInfo(gamePath).GetFiles("selector.apk")
-                        .Concat(new DirectoryInfo(gamePath).GetFiles("selector.pack"))
-                        .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.apk"))
-                        .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.pack"))
-                        .ToArray();
-
+                    if (!File.Exists(apktoolPath))
+                        // can't proceed without apktool
+                        throw new FileNotFoundException();
+                    
                     if (_filesToPatch is null)
-                    {
-                        _filesToPatch = [];
-                        foreach (var file in files)
-                        {
-                            var split = file.Name.Split(".");
-                            _filesToPatch.TryAdd(
-                                split[0] == "selector"
-                                    ? "Menu"
-                                    : split[0].Replace("chapter", "Chapter").Replace("_windows", ""),
-                                file.Name);
-                        }
-                    }
-                    else
-                    {
-                        // check if selected files actually exist and add file extensions
-                        for (var i = _filesToPatch.Count - 1; i >= 0; i--)
-                        {
-                            var key = _filesToPatch.GetAt(i).Key;
-                            var match = false;
-                            foreach (var file in files)
-                            {
-                                var split = file.Name.Split(".");
-                                if (_filesToPatch[key] != split[0])
-                                {
-                                    continue;
-                                }
-                                _filesToPatch[key] += $".{split[1]}";
-                                match = true;
-                                break;
-                            }
+                        // if it's null, that means the user didn't specify anything with --files, so patch every available file
+                        FindPresentChapters(gamePath);
 
-                            if (!match)
-                            {
-                                _filesToPatch.RemoveAt(i);
-                            }
-                        }
-                    }
+                    // since you already need to go to your game folder for deltaquick, putting the output folder there is fine
+                    var outputDir = Path.Join(gamePath, "droid_output");
+                    DeleteDirectoryNoReadOnly(outputDir, true);
+                    Directory.CreateDirectory(outputDir);
 
-                    var translatedPath = Path.Join(gamePath, "translated");
-                    if (!Directory.Exists(translatedPath))
-                    {
-                        Directory.CreateDirectory(translatedPath);
-                    }
-
+                    var tmpDir = Path.Join(Path.GetTempPath(), "DeltaPatcher");
+                    DeleteDirectoryNoReadOnly(tmpDir, true);
+                    
                     foreach (var file in _filesToPatch)
                     {
-                        var fileName = file.Value.Replace(".apk", "").Replace(".pack", "");
-                        var jarOutDir = Path.Join(gamePath, fileName);
-                        var assetsDir = Path.Join(fileName, "assets");
-
-                        if (_makeBackups) {
-                            MakeBackup(gamePath, file.Value);
+                        if (file.Value == "") {
+                            _filesToPatch[file.Key] = "selector";
                         }
-
-                        RunCommand("java", "-jar " + $"{apktoolPath} d -r \"{Path.Join(gamePath, file.Value)}\" -o \"{jarOutDir}\" -f");
-                        await ApplyChapterPatch(gamePath, scriptsPath, file.Key, $"{Path.Join(assetsDir, DataName)}");
-                        RunCommand("java", "-jar " + $"{apktoolPath} b \"{jarOutDir}\" -o \"{Path.Join(translatedPath, file.Value)}\"");
-
-                        // Theoretically, it shouldn't be read-only, because it was created by "apktool"
-                        DeleteDirectoryNoRO(jarOutDir, true);
+                        var chWorkDir = Path.Join(tmpDir, file.Value);      // work dir for the current pack
+                        var chAssetsDir = Path.Join(chWorkDir, "assets");   // assets dir in work dir
+                        Directory.CreateDirectory(chWorkDir);
+                        
+                        if (file.Key == "Menu") {
+                            if (file.Value == "") {
+                                _filesToPatch[file.Key] = "selector";
+                            }
+                            Directory.CreateDirectory(chAssetsDir);
+                            File.Copy(Path.Join(gamePath, "data.win"), Path.Join(chAssetsDir, "data.win"));
+                            //Directory.CreateDirectory(Path.Join(chapterDir, "lib"));
+                            //Directory.CreateDirectory(Path.Join(chapterDir, "original", "META-INF"));
+                        }
+                        else
+                        {
+                            CopyDirectory(Path.Join(gamePath, file.Value), chAssetsDir);
+                            DeleteDirectoryNoReadOnly(Path.Join(chAssetsDir, "vid"), true);
+                        }
+                        
+                        await ApplyChapterPatch(chAssetsDir, scriptsPath, file.Key, "data.win");
+                        File.Move(Path.Join(chAssetsDir, "data.win"), Path.Join(chAssetsDir, "game.droid"));
+                        
+                        var xml = ReadEmbeddedText("AndroidManifest.xml");
+                        if (file.Key == "Menu") {
+                            xml = xml.Replace("android:largeHeap=\"true\"", "");
+                        }
+                        var yml = ReadEmbeddedText("apktool.yml") + "\napkFileName: " + file.Value + ".pack";
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), xml);
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "apktool.yml"), yml);
+                        
+                        RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, file.Value)}.pack\"");
+                        
+                        DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }
-
+                    DeleteDirectoryNoReadOnly(tmpDir, true);
                     break;
                 }
                 case DataWinMode.Mac:
@@ -297,24 +283,8 @@ internal class Program
                 default:
                 {
                     if (_filesToPatch is null)
-                    {
                         // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        _filesToPatch = [];
-                        if (File.Exists(Path.Join(gamePath, DataName)))
-                        {
-                            _filesToPatch.TryAdd("Menu", "");
-                        }
-
-                        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_windows"))
-                        {
-                            if (!File.Exists(Path.Join(dir, DataName)))
-                            {
-                                continue;
-                            }
-                            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-                            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_windows", ""), dirName);
-                        }
-                    }
+                        FindPresentChapters(gamePath);
                 
                     foreach (var file in _filesToPatch) {
                         var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
@@ -386,8 +356,35 @@ internal class Program
             Environment.Exit(2);
         }
     }
+
+    private static void FindPresentChapters(string gamePath)
+    {
+        _filesToPatch = [];
+        if (File.Exists(Path.Join(gamePath, DataName)))
+            _filesToPatch.TryAdd("Menu", "");
+
+        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_windows"))
+        {
+            if (!File.Exists(Path.Join(dir, DataName)))
+                continue;
+            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
+            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_windows", ""), dirName);
+        }
+    }
     
-    private static void RunCommand(string fileName, string arguments)
+    private static string ReadEmbeddedText(string resourceName) {
+        var assembly = Assembly.GetExecutingAssembly();
+
+        using var stream = assembly.GetManifestResourceStream($"DeltaPatcherCLI.{resourceName}");
+        if (stream == null) {
+            throw new FileNotFoundException($"Resource '{resourceName}' not found.");
+        }
+
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+    
+    private static void RunCommand(string fileName, string arguments = "")
     {
         var startInfo = new ProcessStartInfo
         {
@@ -404,7 +401,7 @@ internal class Program
 
     private static void MakeBackup(string path, string file) {
         var sourcePath = Path.Join(path, file);
-        FileCopyNoRO(sourcePath, sourcePath + ".bak", true);
+        FileCopyNoReadOnly(sourcePath, sourcePath + ".bak", true);
     }
 
     public static void WriteLine(string line = null, bool onlyToFile = false)
@@ -456,20 +453,35 @@ internal class Program
             WriteLine($"{LocalizedText.ReadonlyWarningDir} \"{Path.GetDirectoryName(path)}\".");
         }
     }
-    public static void FileCopyNoRO(string sourceFileName, string destFileName, bool overwrite = false)
+    public static void FileCopyNoReadOnly(string sourceFileName, string destFileName, bool overwrite = false)
     {
         RemoveReadOnlyAttr(destFileName);
         File.Copy(sourceFileName, destFileName, overwrite);
     }
-    public static FileStream FileCreateNoRO(string filePath)
+    public static FileStream FileCreateNoReadOnly(string filePath)
     {
         RemoveReadOnlyAttr(filePath);
         return File.Create(filePath);
     }
-    public static void DeleteDirectoryNoRO(string dirPath, bool recursive = false)
-    {
+    public static void DeleteDirectoryNoReadOnly(string dirPath, bool recursive = false) {
+        if (!Directory.Exists(dirPath))
+            return;
         RemoveReadOnlyAttr(dirPath, isDirectory: true);
         Directory.Delete(dirPath, recursive);
+    }
+
+    public static void CopyDirectory(string sourceDir, string destDir) {
+        Directory.CreateDirectory(destDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir)) {
+            var destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: true);
+        }
+
+        foreach (var dir in Directory.GetDirectories(sourceDir)) {
+            var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
+            CopyDirectory(dir, destSubDir);
+        }
     }
 
     private static bool ValidatePaths(string gamePath, string scriptsPath)
@@ -570,7 +582,7 @@ internal class Program
 
             WriteLine(LocalizedText.ApplyPatch8);
 
-            await using (var fileStream = FileCreateNoRO(dataWinPath))
+            await using (var fileStream = FileCreateNoReadOnly(dataWinPath))
             {
                 UndertaleIO.Write(fileStream, data);
             }
