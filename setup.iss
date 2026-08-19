@@ -1,6 +1,6 @@
 [Setup]
 AppName=DELTARUNE (your lang) Translation Installer
-AppVersion=1.6.1
+AppVersion=1.6.2
 AppPublisher=LazyDesman
 DefaultDirName={autopf}\DELTARUNE Translation Patch
 OutputBaseFilename=DeltaruneTranslationInstaller
@@ -50,7 +50,7 @@ tr.FinishedText2=Click «Finish» to exit the setup program.
 tr.ProgressPage1a=Performing the installation
 tr.ProgressPage1b=Please wait...
 tr.FoundGameLoc1=DELTARUNE (Chapters 1-5) was not found in the default folders. Please specify the path manually.
-tr.FoundGameLoc2="DELTARUNE.exe" was not found in the specified folder!
+tr.FoundGameLoc2=The required DELTARUNE game files were not found in the specified folder!
 tr.ProgressPage2a= MB
 tr.ProgressPage2b=File size: 
 tr.FirstLogLine1=Error applying patch: 
@@ -98,6 +98,7 @@ const
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
+  DeltaruneSteamAppId = '1671210';
   ShowDeltaquickCheckmark = False;
 var
   InfoPage: TOutputMsgWizardPage;
@@ -136,9 +137,160 @@ end;
 // Is the full version of DELTARUNE in this folder?
 function CheckDeltaruneLoc(DirPath: String): Boolean;
 begin
-  Result := FileExists(DirPath + DeltaruneExe);
+  Result := FileExists(AddBackslash(DirPath) + DeltaruneExe);
   if Result then
     Result := FileExists(AddBackslash(DirPath) + 'chapter5_windows\data.win');
+end;
+
+function NormalizeSteamPath(Path: String): String;
+begin
+  Result := Trim(Path);
+  StringChangeEx(Result, '\\', '\', True);
+  StringChangeEx(Result, '/', '\', True);
+
+  while (Length(Result) > 3) and (Result[Length(Result)] = '\') do
+    Delete(Result, Length(Result), 1);
+end;
+
+procedure AddUniquePath(var Paths: TArrayOfString; Path: String);
+var
+  i, PathCount: Integer;
+begin
+  Path := NormalizeSteamPath(Path);
+  if Path = '' then
+    Exit;
+
+  for i := 0 to GetArrayLength(Paths) - 1 do
+    if CompareText(Paths[i], Path) = 0 then
+      Exit;
+
+  PathCount := GetArrayLength(Paths);
+  SetArrayLength(Paths, PathCount + 1);
+  Paths[PathCount] := Path;
+end;
+
+function GetVdfKeyValue(Line: String; var Key, Value: String): Boolean;
+var
+  QuotePos: Integer;
+begin
+  Result := False;
+  Key := '';
+  Value := '';
+  Line := Trim(Line);
+
+  if Length(Line) < 1 then
+    Exit;
+  if Line[1] <> '"' then
+    Exit;
+
+  Delete(Line, 1, 1);
+  QuotePos := Pos('"', Line);
+  if QuotePos = 0 then
+    Exit;
+  Key := Copy(Line, 1, QuotePos - 1);
+  Delete(Line, 1, QuotePos);
+  Line := Trim(Line);
+
+  if Length(Line) < 1 then
+    Exit;
+  if Line[1] <> '"' then
+    Exit;
+
+  Delete(Line, 1, 1);
+  QuotePos := Pos('"', Line);
+  if QuotePos = 0 then
+    Exit;
+  Value := Copy(Line, 1, QuotePos - 1);
+  Result := True;
+end;
+
+procedure ReadSteamLibraries(const SteamRoot: String;
+  var Libraries, AppLibraries: TArrayOfString);
+var
+  Lines: TArrayOfString;
+  LibraryFoldersPath, Key, Value, CurrentLibrary: String;
+  i: Integer;
+begin
+  AddUniquePath(Libraries, SteamRoot);
+  LibraryFoldersPath := AddBackslash(SteamRoot) + 'steamapps\libraryfolders.vdf';
+  if not LoadStringsFromFile(LibraryFoldersPath, Lines) then
+    Exit;
+
+  CurrentLibrary := '';
+  for i := 0 to GetArrayLength(Lines) - 1 do
+  begin
+    if not GetVdfKeyValue(Lines[i], Key, Value) then
+      Continue;
+
+    if CompareText(Key, 'path') = 0 then
+    begin
+      CurrentLibrary := NormalizeSteamPath(Value);
+      AddUniquePath(Libraries, CurrentLibrary);
+    end
+    else if (CompareText(Key, DeltaruneSteamAppId) = 0) and
+      (CurrentLibrary <> '') then
+    begin
+      AddUniquePath(AppLibraries, CurrentLibrary);
+    end
+    else
+    begin
+      Value := NormalizeSteamPath(Value);
+      if DirExists(AddBackslash(Value) + 'steamapps') then
+        AddUniquePath(Libraries, Value);
+    end;
+  end;
+end;
+
+function FindDeltaruneInLibrary(const LibraryPath: String): String;
+var
+  Lines: TArrayOfString;
+  ManifestPath, Key, Value, ManifestAppId, InstallDir, Candidate: String;
+  i: Integer;
+begin
+  Result := '';
+  ManifestPath := AddBackslash(LibraryPath) + 'steamapps\appmanifest_' +
+    DeltaruneSteamAppId + '.acf';
+
+  if LoadStringsFromFile(ManifestPath, Lines) then
+  begin
+    ManifestAppId := '';
+    InstallDir := '';
+    for i := 0 to GetArrayLength(Lines) - 1 do
+    begin
+      if GetVdfKeyValue(Lines[i], Key, Value) then
+      begin
+        if CompareText(Key, 'appid') = 0 then
+          ManifestAppId := Value
+        else if CompareText(Key, 'installdir') = 0 then
+          InstallDir := Value;
+      end;
+    end;
+
+    if (CompareText(ManifestAppId, DeltaruneSteamAppId) = 0) and
+      (InstallDir <> '') then
+    begin
+      Candidate := AddBackslash(LibraryPath) + 'steamapps\common\' + InstallDir;
+      if CheckDeltaruneLoc(Candidate) then
+      begin
+        Result := Candidate;
+        Exit;
+      end;
+    end;
+  end;
+
+  Candidate := AddBackslash(LibraryPath) + 'steamapps\common\DELTARUNE';
+  if CheckDeltaruneLoc(Candidate) then
+    Result := Candidate;
+end;
+
+procedure AddSteamRootFromRegistry(var SteamRoots: TArrayOfString;
+  const RootKey: Integer; const ValueName: String);
+var
+  SteamRoot: String;
+begin
+  if RegQueryStringValue(RootKey, 'Software\Valve\Steam', ValueName,
+    SteamRoot) then
+    AddUniquePath(SteamRoots, SteamRoot);
 end;
 
 // Search for the DELTARUNE folder
@@ -146,6 +298,7 @@ function FindGameLocation(): String;
 var
   GameLocations: array[0..3] of String;
   GameLocationsLinux: array[0..1] of String;
+  SteamRoots, SteamLibraries, AppLibraries: TArrayOfString;
   DrivePrefix, Location, UserName: String;
   i, j: Integer;
 begin
@@ -158,6 +311,29 @@ begin
   GameLocationsLinux[0] := 'Z:\home\%s\.local\share\Steam\steamapps\common\DELTARUNE\';
   GameLocationsLinux[1] := 'Z:\home\%s\.var\app\com.valvesoftware.Steam\.local\share\Steam\steamapps\common\DELTARUNE\';
   UserName := GetUserNameString();
+
+  AddSteamRootFromRegistry(SteamRoots, HKCU, 'SteamPath');
+  AddSteamRootFromRegistry(SteamRoots, HKLM32, 'InstallPath');
+  AddSteamRootFromRegistry(SteamRoots, HKLM64, 'InstallPath');
+  AddUniquePath(SteamRoots, ExpandConstant('{commonpf32}\Steam'));
+  AddUniquePath(SteamRoots, ExpandConstant('{commonpf64}\Steam'));
+
+  for i := 0 to GetArrayLength(SteamRoots) - 1 do
+    ReadSteamLibraries(SteamRoots[i], SteamLibraries, AppLibraries);
+
+  for i := 0 to GetArrayLength(AppLibraries) - 1 do
+  begin
+    Result := FindDeltaruneInLibrary(AppLibraries[i]);
+    if Result <> '' then
+      Exit;
+  end;
+
+  for i := 0 to GetArrayLength(SteamLibraries) - 1 do
+  begin
+    Result := FindDeltaruneInLibrary(SteamLibraries[i]);
+    if Result <> '' then
+      Exit;
+  end;
 
   for i := 0 to High(GameLocationsLinux) do
   begin
@@ -389,16 +565,20 @@ begin
       PatchDeltaQuick := InfoCheckbox.Checked;
     end;
     
-    FoundGameLoc := FindGameLocation();
-    if (FoundGameLoc = '') and (not PatchDeltaQuick) then
+    if not PatchDeltaQuick then
     begin
-      MsgBox(CustomMessage('FoundGameLoc1'), mbInformation, MB_OK);
-      Exit;
+      FoundGameLoc := FindGameLocation();
+      if FoundGameLoc = '' then
+      begin
+        MsgBox(CustomMessage('FoundGameLoc1'), mbInformation, MB_OK);
+        Exit;
+      end;
+      GamePathPage.Values[0] := FoundGameLoc;
     end;
   end
   else if CurPageID = GamePathPage.ID then
   begin
-    if (not FileExists(AddBackslash(GamePathPage.Values[0]) + DeltaruneExe)) and (not PatchDeltaQuick) then
+    if (not CheckDeltaruneLoc(GamePathPage.Values[0])) and (not PatchDeltaQuick) then
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
