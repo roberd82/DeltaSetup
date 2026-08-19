@@ -1,23 +1,15 @@
-version: 2.11.0
-isFrameworkApk: false
+version: 3.0.3
 usesFramework:
   ids:
-  - 1
-  tag: null
+    - 1
 sdkInfo:
   minSdkVersion: 21
   targetSdkVersion: 34
-packageInfo:
-  forcedPackageId: 0
-  renameManifestPackage: null
 versionInfo:
   versionCode: 1
   versionName: 1.0
-sharedLibrary: false
-sparseResources: false
-compactEntries: false
 doNotCompress:
-- arsc
-- ogg
-- assets/audiogroup1.dat
+  - arsc
+  - ogg
+  - assets/audiogroup1.dat
 #apkFileName: selector.pack

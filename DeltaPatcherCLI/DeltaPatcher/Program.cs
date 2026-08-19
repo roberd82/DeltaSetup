@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Runtime;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using UndertaleModLib;
 using UndertaleModLib.Scripting;
 
@@ -142,11 +143,15 @@ internal class Program
 
                     if (!File.Exists(apktoolPath))
                         // can't proceed without apktool
-                        throw new FileNotFoundException();
+                        throw new FileNotFoundException("ERROR: apktool.jar not present!");
                     
                     if (_filesToPatch is null)
                         // if it's null, that means the user didn't specify anything with --files, so patch every available file
                         FindPresentChapters(gamePath);
+
+                    // copy modifications needed for android and overwrite the default files
+                    foreach (var dir in Directory.GetDirectories(Path.Join(scriptsPath, "android")))
+                        CopyDirectory(dir, Path.Join(scriptsPath, Path.GetFileName(dir)));
 
                     // since you already need to go to your game folder for deltaquick, putting the output folder there is fine
                     var outputDir = Path.Join(gamePath, "droid_output");
@@ -158,19 +163,18 @@ internal class Program
                     
                     foreach (var file in _filesToPatch)
                     {
-                        if (file.Value == "") {
-                            _filesToPatch[file.Key] = "selector";
-                        }
                         var chWorkDir = Path.Join(tmpDir, file.Value);      // work dir for the current pack
                         var chAssetsDir = Path.Join(chWorkDir, "assets");   // assets dir in work dir
+                        var dataPath = Path.Join(chAssetsDir, "data.win");
                         Directory.CreateDirectory(chWorkDir);
                         
-                        if (file.Key == "Menu") {
-                            if (file.Value == "") {
+                        if (file.Key == "Menu")
+                        {
+                            if (file.Value == "")
                                 _filesToPatch[file.Key] = "selector";
-                            }
+                            
                             Directory.CreateDirectory(chAssetsDir);
-                            File.Copy(Path.Join(gamePath, "data.win"), Path.Join(chAssetsDir, "data.win"));
+                            File.Copy(Path.Join(gamePath, "data.win"), dataPath);
                             //Directory.CreateDirectory(Path.Join(chapterDir, "lib"));
                             //Directory.CreateDirectory(Path.Join(chapterDir, "original", "META-INF"));
                         }
@@ -181,15 +185,15 @@ internal class Program
                         }
                         
                         await ApplyChapterPatch(chAssetsDir, scriptsPath, file.Key, "data.win");
-                        File.Move(Path.Join(chAssetsDir, "data.win"), Path.Join(chAssetsDir, "game.droid"));
+                        File.Move(dataPath, Path.Join(chAssetsDir, "game.droid"));
                         
-                        var xml = ReadEmbeddedText("AndroidManifest.xml");
-                        if (file.Key == "Menu") {
-                            xml = xml.Replace("android:largeHeap=\"true\"", "");
-                        }
                         var yml = ReadEmbeddedText("apktool.yml") + "\napkFileName: " + file.Value + ".pack";
-                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), xml);
+                        var xml = ReadEmbeddedText("AndroidManifest.xml");
+                        if (file.Key == "Menu")
+                            xml = xml.Replace("android:largeHeap=\"true\"", "");
+                        
                         await File.WriteAllTextAsync(Path.Join(chWorkDir, "apktool.yml"), yml);
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), xml);
                         
                         RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, file.Value)}.pack\"");
                         
@@ -522,14 +526,25 @@ internal class Program
 
     private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin)
     {
+        var dataWinPath = Path.Combine(gamePath, dataWin);
+        var scriptsList = JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")));
+
+        WriteLine();
+        WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
+        WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
+
+        foreach (var script in scriptsList)
+        {
+            await RunScript(Path.Join(scriptsPath, script), dataWinPath, $"{LocalizedText.ApplyPatchError1} {chapter}:");
+        }
+        
+        WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
+    }
+
+    private static async Task RunScript(string scriptPath, string dataWinPath, string errorMsg = null)
+    {
         try
         {
-            var dataWinPath = Path.Combine(gamePath, dataWin);
-            var scriptPath = Path.Combine(scriptsPath, chapter, "Fix.csx");
-
-            WriteLine();
-            WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
-            WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
             WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
 
             if (!File.Exists(dataWinPath))
@@ -593,12 +608,11 @@ internal class Program
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
             GC.WaitForPendingFinalizers();
-
-            WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
         }
         catch (Exception ex)
         {
-            WriteLine($"{LocalizedText.ApplyPatchError1} {chapter}:");
+            if (errorMsg is not null)
+                WriteLine(errorMsg);
             WriteLine(ex.Message);
 
             if (ex.InnerException != null)
