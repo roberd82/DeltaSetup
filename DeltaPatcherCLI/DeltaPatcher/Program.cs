@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime;
 using System.Runtime.InteropServices;
@@ -175,8 +176,8 @@ internal class Program
                             
                             Directory.CreateDirectory(chAssetsDir);
                             File.Copy(Path.Join(gamePath, "data.win"), dataPath);
-                            //Directory.CreateDirectory(Path.Join(chapterDir, "lib"));
-                            //Directory.CreateDirectory(Path.Join(chapterDir, "original", "META-INF"));
+                            Directory.CreateDirectory(Path.Join(chWorkDir, "lib"));
+                            ExtractEmbeddedZip("lib.zip", Path.Join(chWorkDir, "lib"));
                         }
                         else
                         {
@@ -376,16 +377,20 @@ internal class Program
         }
     }
     
-    private static string ReadEmbeddedText(string resourceName) {
-        var assembly = Assembly.GetExecutingAssembly();
+    private static Stream GetEmbeddedFileStream(string resourceName) =>
+        Assembly.GetExecutingAssembly().GetManifestResourceStream($"DeltaPatcherCLI.{resourceName}")
+        ?? throw new FileNotFoundException($"Resource '{resourceName}' not found.");
 
-        using var stream = assembly.GetManifestResourceStream($"DeltaPatcherCLI.{resourceName}");
-        if (stream == null) {
-            throw new FileNotFoundException($"Resource '{resourceName}' not found.");
-        }
-
-        using var reader = new StreamReader(stream);
+    private static string ReadEmbeddedText(string resourceName)
+    {
+        using var reader = new StreamReader(GetEmbeddedFileStream(resourceName));
         return reader.ReadToEnd();
+    }
+    
+    private static void ExtractEmbeddedZip(string resourceName, string destinationDirectory) {
+        using var stream = GetEmbeddedFileStream(resourceName);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        archive.ExtractToDirectory(destinationDirectory);
     }
     
     private static void RunCommand(string fileName, string arguments = "")
@@ -403,7 +408,8 @@ internal class Program
         process?.WaitForExit();
     }
 
-    private static void MakeBackup(string path, string file) {
+    private static void MakeBackup(string path, string file)
+    {
         var sourcePath = Path.Join(path, file);
         FileCopyNoReadOnly(sourcePath, sourcePath + ".bak", true);
     }
@@ -467,22 +473,26 @@ internal class Program
         RemoveReadOnlyAttr(filePath);
         return File.Create(filePath);
     }
-    public static void DeleteDirectoryNoReadOnly(string dirPath, bool recursive = false) {
+    public static void DeleteDirectoryNoReadOnly(string dirPath, bool recursive = false)
+    {
         if (!Directory.Exists(dirPath))
             return;
         RemoveReadOnlyAttr(dirPath, isDirectory: true);
         Directory.Delete(dirPath, recursive);
     }
 
-    public static void CopyDirectory(string sourceDir, string destDir) {
+    public static void CopyDirectory(string sourceDir, string destDir)
+    {
         Directory.CreateDirectory(destDir);
 
-        foreach (var file in Directory.GetFiles(sourceDir)) {
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
             var destFile = Path.Combine(destDir, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);
         }
 
-        foreach (var dir in Directory.GetDirectories(sourceDir)) {
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
             var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
             CopyDirectory(dir, destSubDir);
         }
@@ -527,16 +537,16 @@ internal class Program
     private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin)
     {
         var dataWinPath = Path.Combine(gamePath, dataWin);
-        var scriptsList = JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")));
+        var scriptsList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
+            ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
+            : [Path.Join(chapter, "Fix.json")];  // fallback
 
         WriteLine();
         WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
         WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
 
         foreach (var script in scriptsList)
-        {
             await RunScript(Path.Join(scriptsPath, script), dataWinPath, $"{LocalizedText.ApplyPatchError1} {chapter}:");
-        }
         
         WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
     }
