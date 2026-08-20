@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using UndertaleModLib;
+using UndertaleModLib.Project;
 using UndertaleModLib.Scripting;
 
 namespace DeltaPatcherCLI;
@@ -153,11 +154,10 @@ internal class Program
                         FindPresentChapters(gamePath);
 
                     // copy modifications needed for android and overwrite the default files
-                    foreach (var dir in Directory.GetDirectories(Path.Join(scriptsPath, "android")))
-                        CopyDirectory(dir, Path.Join(scriptsPath, Path.GetFileName(dir)));
+                    CopyDirectory(Path.Join(scriptsPath, "android"), Path.Join(scriptsPath));
 
                     // since you already need to go to your game folder for deltaquick, putting the output folder there is fine
-                    var outputDir = Path.Join(gamePath, "droid_output");
+                    var outputDir = Path.Join(gamePath, "packs");
                     DeleteDirectoryNoReadOnly(outputDir, true);
                     Directory.CreateDirectory(outputDir);
 
@@ -166,6 +166,9 @@ internal class Program
                     
                     foreach (var file in _filesToPatch)
                     {
+                        if (file is { Key: "Menu", Value: "" })
+                            _filesToPatch[file.Key] = "selector";
+                        
                         var chWorkDir = Path.Join(tmpDir, file.Value);      // work dir for the current pack
                         var chAssetsDir = Path.Join(chWorkDir, "assets");   // assets dir in work dir
                         var dataPath = Path.Join(chAssetsDir, "data.win");
@@ -173,9 +176,6 @@ internal class Program
                         
                         if (file.Key == "Menu")
                         {
-                            if (file.Value == "")
-                                _filesToPatch[file.Key] = "selector";
-                            
                             Directory.CreateDirectory(chAssetsDir);
                             File.Copy(Path.Join(gamePath, "data.win"), dataPath);
                             Directory.CreateDirectory(Path.Join(chWorkDir, "lib"));
@@ -536,19 +536,21 @@ internal class Program
         }
     }
 
-    private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin) {
-        try {
+    private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin)
+    {
+        try
+        {
             var dataWinPath = Path.Combine(gamePath, dataWin);
-            var scriptsList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
-                ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
-                : [Path.Join(chapter, "Fix")]; // fallback
 
             WriteLine();
             WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
             WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
 
-            foreach (var scriptPath in scriptsList)
+            foreach (var scriptName in File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
+                                       ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
+                                       : [Path.Join(chapter, "Fix")])   // fallback
             {
+                var scriptPath = Path.Join(scriptsPath, scriptName + ".csx");
                 WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
 
                 if (!File.Exists(dataWinPath))
@@ -578,14 +580,16 @@ internal class Program
                     Data = data,
                     FilePath = dataWinPath,
                     ScriptPath = scriptPath,
-                    ExePath = Path.Join(Path.GetTempPath(), "DeltaPatcher"),
-                    PreChosenDirectory = Path.Join(Path.GetDirectoryName(scriptPath), "import")// aaaaaaaa
+                    ExePath = Path.Join(Path.GetTempPath(), "DeltaPatcher", chapter, scriptName),
+                    PreChosenDirectory = Path.Join(scriptsPath, chapter, scriptName + "_import")
                 };
 
                 object prop = scriptGlobals.Data;
                 prop = scriptGlobals.FilePath;
                 prop = scriptGlobals.ScriptPath;
                 prop = scriptGlobals.ExePath;
+                prop = scriptGlobals.PreChosenDirectory;
+                prop = scriptGlobals.Project;
                 scriptGlobals.ScriptMessage(null, true);
                 scriptGlobals.ScriptWarning(null, true);
                 scriptGlobals.ScriptError(null, true);
@@ -618,8 +622,8 @@ internal class Program
                 GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
             }
+            WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
         }
         catch (Exception ex)
         {
@@ -656,6 +660,8 @@ public class ScriptGlobals
     {
         if (Data is null) throw new ScriptException("No data file is currently loaded!");
     }
+    
+    public ProjectContext Project => null;
 
     public bool ScriptQuestion(string message) => true;     // always answer yes to proceed with the script
 

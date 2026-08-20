@@ -36,6 +36,7 @@
     <ProjectReference Include="..\UndertaleModTool\UndertaleModLib\UndertaleModLib.csproj" />
     <TrimmerRootAssembly Include="Underanalyzer" />
     <TrimmerRootAssembly Include="UndertaleModLib" />
+    <TrimmerRootAssembly Include="Magick.NET-Q8-AnyCPU" />
   </ItemGroup>
 
   <ItemGroup>
