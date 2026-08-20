@@ -1,8 +1,8 @@
 [Setup]
 AppName=DELTARUNE (your lang) Translation Installer
-AppVersion=1.6.2
+AppVersion=1.7.0
 AppPublisher=LazyDesman
-DefaultDirName={autopf}\DELTARUNE Translation Patch
+//DefaultDirName={autopf}\DELTARUNE Translation Patch
 OutputBaseFilename=DeltaruneTranslationInstaller
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -10,7 +10,7 @@ SetupIconFile=icon.ico
 WizardStyle=modern dynamic
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
-DisableDirPage=yes
+//DisableDirPage=yes
 DisableWelcomePage=no
 WizardSmallImageFile=logo.bmp
 WizardImageFile=banner.bmp
@@ -19,6 +19,10 @@ WizardImageFileDynamicDark=banner.bmp
 // SetupLogging=True
 ShowLanguageDialog=yes
 UsePreviousLanguage=no
+WizardSizePercent=130,130
+// this makes DefaultDirName and DisableDirPage not matter
+CreateAppDir=no
+Uninstallable=no
 
 [Languages]
 Name: "tr"; MessagesFile: "compiler:Default.isl"
@@ -90,6 +94,7 @@ tr.PlatformWindows=Windows
 tr.PlatformAndroid=Android
 tr.PlatformConsole=Console
 tr.PlatformMac=Mac
+tr.BordersCheckbox=Add console-exclusive borders
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -103,12 +108,13 @@ const
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
   DeltaruneSteamAppId = '1671210';
-  ShowPlatformSelect = False;
+  ShowPlatformSelect = True;
 type
 TPlatformInfo = record
-  MessageKey: String;        // key in [CustomMessages] for the dropdown label
-  CliFlag: String;           // extra argument for DeltaPatcherCLI.exe ('' = none)
-  RequiresGamePath: Boolean; // True if the installer should search for the game
+  MessageKey: String;         // key in [CustomMessages] for the dropdown label
+  CliFlag: String;            // extra argument for DeltaPatcherCLI.exe ('' = none)
+  RequiresGamePath: Boolean;  // True if the installer should search for the game
+  ForceBorders: Boolean;      // True to force the --borders argument, False to let the user chose (if the checkbox is visible)
 end;
 var
   InfoPage: TOutputMsgWizardPage;
@@ -129,7 +135,11 @@ var
   SkipLangFiles: Boolean;
   MakeBackups: Boolean;
 
-procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath: Boolean);
+  LangLinkLabel: TNewStaticText;
+  ScriptsLinkLabel: TNewStaticText;
+  BordersCheckbox: TNewCheckBox;
+
+procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath, ForceBorders: Boolean);
 var
   Idx: Integer;
 begin
@@ -138,6 +148,7 @@ begin
   Platforms[Idx].MessageKey := MessageKey;
   Platforms[Idx].CliFlag := CliFlag;
   Platforms[Idx].RequiresGamePath := RequiresGamePath;
+  Platforms[Idx].ForceBorders := ForceBorders;
 end;
 
 // --- Available platforms ---
@@ -145,10 +156,28 @@ end;
 // Order here is the order shown in the dropdown; first entry is the default.
 procedure InitPlatforms;
 begin
-  AddPlatform('PlatformWindows',          '',  True);
-  AddPlatform('PlatformAndroid',   '--droid', False);
-  //AddPlatform('PlatformConsole', '--console', False);
-  //AddPlatform('PlatformMac'    ,     '--mac', False);
+  AddPlatform('PlatformWindows',          '',  True, False);
+  AddPlatform('PlatformAndroid',   '--droid', False,  True);
+  //AddPlatform('PlatformConsole', '--console', False,  True);
+  //AddPlatform('PlatformMac'    ,     '--mac', False, False);
+end;
+
+procedure OpenLinkClick(Sender: TObject);
+var
+  ErrorCode: Integer;
+begin
+  ShellExec('open', TNewStaticText(Sender).Caption, '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+end;
+
+function CreateLinkLabel(AOwner: TWinControl; const URL: String): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(AOwner);
+  Result.Parent := AOwner;
+  Result.Caption := URL;
+  Result.Cursor := crHand;
+  Result.Font.Color := clBlue;
+  Result.Font.Style := [fsUnderline];
+  Result.OnClick := @OpenLinkClick;
 end;
 
 procedure InitExistingDrives;
@@ -518,6 +547,16 @@ begin
   ShowOptionsPopup;
 end;
 
+procedure UpdatePlatformControls;
+begin
+  BordersCheckbox.Visible := not Platforms[PlatformCombo.ItemIndex].ForceBorders;
+end;
+
+procedure PlatformComboChange(Sender: TObject);
+begin
+  UpdatePlatformControls;
+end;
+
 procedure InitializeWizard;
 var
   i: Integer;
@@ -540,18 +579,33 @@ begin
     CustomMessage('wpWelcome10') + #13#10 +
     CustomMessage('wpWelcome11') + #13#10#13#10 +
     CustomMessage('wpWelcome12') + #13#10 +
-    CustomMessage('wpWelcome13') +  #13#10 +
-    LangURL + #13#10 +
-    ScriptsURL
+    CustomMessage('wpWelcome13')
   );
+  LangLinkLabel := CreateLinkLabel(InfoPage.Surface, LangURL);
+  LangLinkLabel.Top := InfoPage.MsgLabel.Top + InfoPage.MsgLabel.Height + ScaleY(4);
+  LangLinkLabel.Left := InfoPage.MsgLabel.Left;
+
+  ScriptsLinkLabel := CreateLinkLabel(InfoPage.Surface, ScriptsURL);
+  ScriptsLinkLabel.Top := LangLinkLabel.Top + LangLinkLabel.Height + ScaleY(4);
+  ScriptsLinkLabel.Left := InfoPage.MsgLabel.Left;
   if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
   begin
+    PlatformLabel := TNewStaticText.Create(InfoPage);
+    with PlatformLabel do
+    begin
+      Parent := InfoPage.Surface;
+      Left := 0;
+      Top := ScriptsLinkLabel.Top + ScriptsLinkLabel.Height + ScaleY(12);
+      Width := InfoPage.SurfaceWidth;
+      Caption := CustomMessage('PlatformLabel1');
+    end;
+
     PlatformCombo := TNewComboBox.Create(InfoPage);
     with PlatformCombo do
     begin
       Parent := InfoPage.Surface;
       Left := 0;
-      Top := InfoPage.SurfaceHeight - Height - 8;
+      Top := PlatformLabel.Top + PlatformLabel.Height + ScaleY(4);
       Width := InfoPage.SurfaceWidth;
       Style := csDropDownList;
       for i := 0 to GetArrayLength(Platforms) - 1 do
@@ -559,15 +613,19 @@ begin
       ItemIndex := 0;
     end;
 
-    PlatformLabel := TNewStaticText.Create(InfoPage);
-    with PlatformLabel do
+    PlatformCombo.OnChange := @PlatformComboChange;
+
+    BordersCheckbox := TNewCheckBox.Create(InfoPage);
+    with BordersCheckbox do
     begin
       Parent := InfoPage.Surface;
       Left := 0;
-      Top := PlatformCombo.Top - Height - 4;
+      Top := PlatformCombo.Top + PlatformCombo.Height + ScaleY(8);
       Width := InfoPage.SurfaceWidth;
-      Caption := CustomMessage('PlatformLabel1');
+      Caption := CustomMessage('BordersCheckbox');
+      Checked := False;
     end;
+    UpdatePlatformControls;
   end;
 
   ExtraButton := TNewButton.Create(WizardForm);
@@ -861,6 +919,17 @@ begin
     if Platforms[SelectedPlatform].CliFlag <> '' then
     begin
       ArgString := ArgString + ' ' + Platforms[SelectedPlatform].CliFlag;
+    end;
+
+    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
+    begin
+      if Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked then
+        ArgString := ArgString + ' --borders';
+    end
+    else
+    begin
+      if Platforms[SelectedPlatform].ForceBorders then
+        ArgString := ArgString + ' --borders';
     end;
 
     if MakeBackups then

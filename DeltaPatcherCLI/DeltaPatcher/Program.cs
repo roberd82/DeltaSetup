@@ -33,6 +33,7 @@ internal class Program
     private static bool _writeOutputToFile = true;
     private static DataWinMode _winMode = DataWinMode.Windows;
     private static bool _makeBackups;
+    private static bool _addBorders;
     private static string DataName => _winMode switch
     {
         DataWinMode.Windows => "data.win",
@@ -81,6 +82,9 @@ internal class Program
                         break;
                     case "--make-backups":
                         _makeBackups = true;
+                        break;
+                    case "--borders":
+                        _addBorders = true;
                         break;
                     case "--files" when i + 1 < args.Length: 
                         _filesToPatch = [];
@@ -215,24 +219,8 @@ internal class Program
                     }
 
                     if (_filesToPatch is null)
-                    {
                         // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        _filesToPatch = [];
-                        if (File.Exists(Path.Join(gamePath, DataName)))
-                        {
-                            _filesToPatch.TryAdd("Menu", "");
-                        }
-
-                        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_mac"))
-                        {
-                            if (!File.Exists(Path.Join(dir, DataName)))
-                            {
-                                continue;
-                            }
-                            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-                            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_mac", ""), dirName);
-                        }
-                    }
+                        FindPresentChapters(gamePath, "_mac");
                 
                     foreach (var file in _filesToPatch) {
                         var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
@@ -246,6 +234,7 @@ internal class Program
                 }
                 case DataWinMode.Console:
                 {
+                    _addBorders = false; // should already be present?
                     // TODO: prompt the user to choose an nsz or somehow dump the game's RomFS here..?????
 
                     if (_filesToPatch is null)
@@ -365,18 +354,18 @@ internal class Program
         }
     }
 
-    private static void FindPresentChapters(string gamePath)
+    private static void FindPresentChapters(string gamePath, string suffix = "_windows")
     {
         _filesToPatch = [];
         if (File.Exists(Path.Join(gamePath, DataName)))
             _filesToPatch.TryAdd("Menu", "");
 
-        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_windows"))
+        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?" + suffix))
         {
             if (!File.Exists(Path.Join(dir, DataName)))
                 continue;
             var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_windows", ""), dirName);
+            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace(suffix, ""), dirName);
         }
     }
     
@@ -543,14 +532,18 @@ internal class Program
         try
         {
             var dataWinPath = Path.Combine(gamePath, dataWin);
+            var scriptList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
+                            ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
+                            : [Path.Join(chapter, "Fix")];   // fallback
 
             WriteLine();
             WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
             WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
 
-            foreach (var scriptName in File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
-                                       ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
-                                       : [Path.Join(chapter, "Fix")])   // fallback
+            if (_addBorders && File.Exists(Path.Combine(scriptsPath, chapter, "borders.csx")))
+                scriptList.Insert(0, Path.Combine(chapter, "borders"));
+
+            foreach (var scriptName in scriptList)
             {
                 var scriptPath = Path.Join(scriptsPath, scriptName + ".csx");
                 WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
