@@ -178,8 +178,9 @@ internal class Program
                         {
                             Directory.CreateDirectory(chAssetsDir);
                             File.Copy(Path.Join(gamePath, "data.win"), dataPath);
-                            Directory.CreateDirectory(Path.Join(chWorkDir, "lib"));
-                            ExtractEmbeddedZip("lib.zip", Path.Join(chWorkDir, "lib"));
+                            // it appears to be working without the lib folder, so for now it gets commented out
+                            //Directory.CreateDirectory(Path.Join(chWorkDir, "lib"));
+                            //ExtractEmbeddedZip("lib.zip", Path.Join(chWorkDir, "lib"));
                         }
                         else
                         {
@@ -389,11 +390,12 @@ internal class Program
         return reader.ReadToEnd();
     }
     
-    private static void ExtractEmbeddedZip(string resourceName, string destinationDirectory) {
+    /*private static void ExtractEmbeddedZip(string resourceName, string destinationDirectory)
+     {
         using var stream = GetEmbeddedFileStream(resourceName);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
         archive.ExtractToDirectory(destinationDirectory);
-    }
+    }*/
     
     private static void RunCommand(string fileName, string arguments = "")
     {

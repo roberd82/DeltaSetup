@@ -444,7 +444,7 @@ begin
     MakeBackupsCheck.Width := PopupForm.ClientWidth - ScaleX(32);
     MakeBackupsCheck.Height := ScaleY(20);
     MakeBackupsCheck.Caption := CustomMessage('PatchSelectPage6');
-    MakeBackupsCheck.Checked := SkipLangFiles;
+    MakeBackupsCheck.Checked := MakeBackups;
 
     OKButton := TNewButton.Create(PopupForm);
     OKButton.Parent := PopupForm;

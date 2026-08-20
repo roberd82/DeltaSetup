@@ -57,9 +57,6 @@
   <ItemGroup>
     <EmbeddedResource Include="AndroidManifest.xml" />
   </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="lib.zip" />
-  </ItemGroup>
 
   <PropertyGroup>
     <TrimMode>copyused</TrimMode>
