@@ -123,12 +123,14 @@ internal class Program
             _scriptOptions = ScriptOptions.Default
                             .AddImports("UndertaleModLib", "UndertaleModLib.Models",
                                         "UndertaleModLib.Compiler", "UndertaleModLib.Decompiler",
+                                        "UndertaleModLib.Util", "ImageMagick",
                                         "System", "System.IO", "System.Collections.Generic",
                                         "System.Text.RegularExpressions")
                             .AddReferences(typeof(UndertaleObject).GetTypeInfo().Assembly,
                                            typeof(Program).GetTypeInfo().Assembly,
                                            typeof(System.Text.RegularExpressions.Regex).GetTypeInfo().Assembly,
-                                           typeof(Underanalyzer.Decompiler.DecompileContext).Assembly)
+                                           typeof(Underanalyzer.Decompiler.DecompileContext).Assembly,
+                                           typeof(ImageMagick.MagickImage).GetTypeInfo().Assembly)
                             .WithFileEncoding(Encoding.UTF8);
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(false);
@@ -534,95 +536,94 @@ internal class Program
         }
     }
 
-    private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin)
-    {
-        var dataWinPath = Path.Combine(gamePath, dataWin);
-        var scriptsList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
-            ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
-            : [Path.Join(chapter, "Fix.json")];  // fallback
+    private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin) {
+        try {
+            var dataWinPath = Path.Combine(gamePath, dataWin);
+            var scriptsList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
+                ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
+                : [Path.Join(chapter, "Fix")]; // fallback
 
-        WriteLine();
-        WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
-        WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
+            WriteLine();
+            WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
+            WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
 
-        foreach (var script in scriptsList)
-            await RunScript(Path.Join(scriptsPath, script), dataWinPath, $"{LocalizedText.ApplyPatchError1} {chapter}:");
-        
-        WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
-    }
-
-    private static async Task RunScript(string scriptPath, string dataWinPath, string errorMsg = null)
-    {
-        try
-        {
-            WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
-
-            if (!File.Exists(dataWinPath))
+            foreach (var scriptPath in scriptsList)
             {
-                throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");
+                WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
+
+                if (!File.Exists(dataWinPath))
+                {
+                    throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");
+                }
+
+                if (!File.Exists(scriptPath))
+                {
+                    throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");
+                }
+
+                WriteLine(LocalizedText.ApplyPatch6);
+                
+                UndertaleData data;
+                await using (var fileStream = File.OpenRead(dataWinPath))
+                {
+                    data = UndertaleIO.Read(fileStream);
+                }
+
+                WriteLine(LocalizedText.ApplyPatch7);
+                
+                var script = await File.ReadAllTextAsync(scriptPath);
+
+                ScriptGlobals scriptGlobals = new()
+                {
+                    Data = data,
+                    FilePath = dataWinPath,
+                    ScriptPath = scriptPath,
+                    ExePath = Path.Join(Path.GetTempPath(), "DeltaPatcher"),
+                    PreChosenDirectory = Path.Join(Path.GetDirectoryName(scriptPath), "import")// aaaaaaaa
+                };
+
+                object prop = scriptGlobals.Data;
+                prop = scriptGlobals.FilePath;
+                prop = scriptGlobals.ScriptPath;
+                prop = scriptGlobals.ExePath;
+                scriptGlobals.ScriptMessage(null, true);
+                scriptGlobals.ScriptWarning(null, true);
+                scriptGlobals.ScriptError(null, true);
+                scriptGlobals.MainThreadAction(() => { });
+                scriptGlobals.SetProgressBar(null, null, -1, -1);
+                scriptGlobals.UpdateProgressValue(-1);
+                scriptGlobals.IncrementProgress();
+                scriptGlobals.GetProgress();
+                scriptGlobals.ShowMessage(null, true);
+                scriptGlobals.ShowWarning(null, true);
+                scriptGlobals.EnsureDataLoaded();
+                scriptGlobals.ScriptQuestion(null);
+                scriptGlobals.PromptChooseDirectory();
+                new ScriptGlobals.ScriptException("abc");
+
+                SourceFileResolver srcResolver = new(searchPaths: ImmutableArray<string>.Empty,
+                                                     baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
+                await CSharpScript.RunAsync(script, _scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
+
+                WriteLine(LocalizedText.ApplyPatch8);
+
+                await using (var fileStream = FileCreateNoReadOnly(dataWinPath))
+                {
+                    UndertaleIO.Write(fileStream, data);
+                }
+
+                scriptGlobals.Data = null;
+                data.Dispose();
+
+                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
             }
-
-            if (!File.Exists(scriptPath))
-            {
-                throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");
-            }
-
-            WriteLine(LocalizedText.ApplyPatch6);
-            
-            UndertaleData data;
-            await using (var fileStream = File.OpenRead(dataWinPath))
-            {
-                data = UndertaleIO.Read(fileStream);
-            }
-
-            WriteLine(LocalizedText.ApplyPatch7);
-            
-            var script = await File.ReadAllTextAsync(scriptPath);
-
-            ScriptGlobals scriptGlobals = new()
-            {
-                Data = data,
-                FilePath = dataWinPath,
-                ScriptPath = scriptPath
-            };
-
-            object prop = scriptGlobals.Data;
-            prop = scriptGlobals.FilePath;
-            prop = scriptGlobals.ScriptPath;
-            scriptGlobals.ScriptMessage(null, true);
-            scriptGlobals.ScriptWarning(null, true);
-            scriptGlobals.ScriptError(null, true);
-            scriptGlobals.MainThreadAction(() => { });
-            scriptGlobals.SetProgressBar(null, null, -1, -1);
-            scriptGlobals.UpdateProgressValue(-1);
-            scriptGlobals.IncrementProgress();
-            scriptGlobals.GetProgress();
-            scriptGlobals.ShowMessage(null, true);
-            scriptGlobals.ShowWarning(null, true);
-            new ScriptGlobals.ScriptException("abc");
-
-            SourceFileResolver srcResolver = new(searchPaths: ImmutableArray<string>.Empty,
-                                                 baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
-            await CSharpScript.RunAsync(script, _scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
-
-            WriteLine(LocalizedText.ApplyPatch8);
-
-            await using (var fileStream = FileCreateNoReadOnly(dataWinPath))
-            {
-                UndertaleIO.Write(fileStream, data);
-            }
-
-            scriptGlobals.Data = null;
-            data.Dispose();
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
         }
         catch (Exception ex)
         {
-            if (errorMsg is not null)
-                WriteLine(errorMsg);
+            WriteLine($"{LocalizedText.ApplyPatchError1} {chapter}:");
             WriteLine(ex.Message);
 
             if (ex.InnerException != null)
@@ -647,8 +648,19 @@ public class ScriptGlobals
     public UndertaleData Data { get; set; }
     public string FilePath { get; set; }
     public string ScriptPath { get; set; }
+    public string ExePath { get; set; }                     // set what path the script should treat as the "ExePath"
 
     public Action<Action> MainThreadAction => static (f) => f();
+
+    public void EnsureDataLoaded()
+    {
+        if (Data is null) throw new ScriptException("No data file is currently loaded!");
+    }
+
+    public bool ScriptQuestion(string message) => true;     // always answer yes to proceed with the script
+
+    public string PreChosenDirectory { get; set; }          // pre-set a directory in case the script asks for one
+    public string PromptChooseDirectory() => string.IsNullOrWhiteSpace(PreChosenDirectory) ? null : PreChosenDirectory;
 
     public void ScriptMessage(string message, bool dummy = false)
     {
