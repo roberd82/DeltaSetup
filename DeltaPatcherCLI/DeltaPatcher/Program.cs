@@ -93,7 +93,7 @@ internal class Program
                             var lower = entry.ToLower().Trim();
                             if (lower is "menu" or "chapter_select" or "selector" or "chapter0" or "ch0")
                             {
-                                _filesToPatch.TryAdd("Menu", _winMode == DataWinMode.Droid ? "selector" : "");
+                                _filesToPatch.TryAdd("Menu", "");
                             }
                             else if ((lower.StartsWith("chapter") || lower.StartsWith("ch")) && char.IsDigit(lower[^1]))
                             {
@@ -170,15 +170,15 @@ internal class Program
                     
                     foreach (var file in _filesToPatch)
                     {
-                        if (file is { Key: "Menu", Value: "" })
-                            _filesToPatch[file.Key] = "selector";
+                        var chapter = file.Key;
+                        var fileName = chapter == "Menu" ? "selector" : file.Value;
                         
-                        var chWorkDir = Path.Join(tmpDir, file.Value);      // work dir for the current pack
+                        var chWorkDir = Path.Join(tmpDir, fileName);      // work dir for the current pack
                         var chAssetsDir = Path.Join(chWorkDir, "assets");   // assets dir in work dir
                         var dataPath = Path.Join(chAssetsDir, "data.win");
                         Directory.CreateDirectory(chWorkDir);
                         
-                        if (file.Key == "Menu")
+                        if (chapter == "Menu")
                         {
                             Directory.CreateDirectory(chAssetsDir);
                             File.Copy(Path.Join(gamePath, "data.win"), dataPath);
@@ -188,22 +188,22 @@ internal class Program
                         }
                         else
                         {
-                            CopyDirectory(Path.Join(gamePath, file.Value), chAssetsDir);
+                            CopyDirectory(Path.Join(gamePath, fileName), chAssetsDir);
                             DeleteDirectoryNoReadOnly(Path.Join(chAssetsDir, "vid"), true);
                         }
                         
-                        await ApplyChapterPatch(chAssetsDir, scriptsPath, file.Key, "data.win");
+                        await ApplyChapterPatch(chAssetsDir, scriptsPath, chapter, "data.win");
                         File.Move(dataPath, Path.Join(chAssetsDir, "game.droid"));
                         
-                        var yml = ReadEmbeddedText("apktool.yml") + "\napkFileName: " + file.Value + ".pack";
+                        var yml = ReadEmbeddedText("apktool.yml") + "\napkFileName: " + fileName + ".pack";
                         var xml = ReadEmbeddedText("AndroidManifest.xml");
-                        if (file.Key == "Menu")
+                        if (chapter == "Menu")
                             xml = xml.Replace("android:largeHeap=\"true\"", "");
                         
                         await File.WriteAllTextAsync(Path.Join(chWorkDir, "apktool.yml"), yml);
                         await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), xml);
                         
-                        RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, file.Value)}.pack\"");
+                        RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, fileName)}.pack\"");
                         
                         DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }
@@ -545,6 +545,15 @@ internal class Program
 
             foreach (var scriptName in scriptList)
             {
+                if (File.Exists(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"))) {
+                    // append MoreCodeChanges.txt to CodeChanges if exists
+                    var codePath = Path.Join(scriptsPath, chapter, "CodeChanges.txt");
+                    var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"));
+                    var codeChanges = "";
+                    if (File.Exists(codePath))
+                        codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
+                    await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
+                }
                 var scriptPath = Path.Join(scriptsPath, scriptName + ".csx");
                 WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
 

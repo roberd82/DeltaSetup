@@ -56,5 +56,5 @@ IMPORTANT! YOU HAVE THO HAVE [JAVA JRE](https://adoptium.net/temurin/releases) I
 - the output will be in the `packs` folder in the game installation folder, and the `lang` folder will be also here like normal
 - bring over the game files along with the lang folder and the packs folder to your phone
 - Download [DeltaQuick](https://play.google.com/store/apps/details?id=com.bookerpuzzle.deltaquick&pcampaignid=web_share), and follow the instructions for it
-- after you finished, open the save file manager and load the full `lang` and `packs` full folders to the root folder
+- after you finished, open the save file manager and load the full `lang` and `packs` folders to the root folder
 - Done!

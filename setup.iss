@@ -108,7 +108,7 @@ const
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
   DeltaruneSteamAppId = '1671210';
-  ShowPlatformSelect = True;
+  ShowPlatformSelect = False;
 type
 TPlatformInfo = record
   MessageKey: String;         // key in [CustomMessages] for the dropdown label
