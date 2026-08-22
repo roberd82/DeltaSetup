@@ -26,6 +26,7 @@ internal class Program
     }
 
     public static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    public static readonly string ProgramTmpPath = Path.Join(Path.GetTempPath(), "DeltaPatcher");
 
     private static ScriptOptions _scriptOptions;
     private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
@@ -46,6 +47,7 @@ internal class Program
 
     private static async Task Main(string[] args)
     {
+        DeleteDirectoryNoReadOnly(ProgramTmpPath, true);    // fully fresh start
         var gamePath = "";
         var scriptsPath = "";
 
@@ -158,22 +160,19 @@ internal class Program
                         FindPresentChapters(gamePath);
 
                     // copy modifications needed for android and overwrite the default files
-                    CopyDirectory(Path.Join(scriptsPath, "android"), Path.Join(scriptsPath));
-
+                    if (Directory.Exists(Path.Join(scriptsPath, "android")))
+                        CopyDirectory(Path.Join(scriptsPath, "android"), Path.Join(scriptsPath));
+                    
                     // since you already need to go to your game folder for deltaquick, putting the output folder there is fine
                     var outputDir = Path.Join(gamePath, "packs");
-                    DeleteDirectoryNoReadOnly(outputDir, true);
                     Directory.CreateDirectory(outputDir);
-
-                    var tmpDir = Path.Join(Path.GetTempPath(), "DeltaPatcher");
-                    DeleteDirectoryNoReadOnly(tmpDir, true);
                     
                     foreach (var (chapter, value) in _filesToPatch)
                     {
                         var fileName = chapter == "Menu" ? "selector" : value;
                         
-                        var chWorkDir = Path.Join(tmpDir, fileName);      // work dir for the current pack
-                        var chAssetsDir = Path.Join(chWorkDir, "assets");   // assets dir in work dir
+                        var chWorkDir = Path.Join(ProgramTmpPath, fileName);    // work dir for the current pack
+                        var chAssetsDir = Path.Join(chWorkDir, "assets");       // assets dir in work dir
                         var dataPath = Path.Join(chAssetsDir, "data.win");
                         Directory.CreateDirectory(chWorkDir);
                         
@@ -206,7 +205,6 @@ internal class Program
                         
                         DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }
-                    DeleteDirectoryNoReadOnly(tmpDir, true);
                     break;
                 }
                 case DataWinMode.Mac:
@@ -579,7 +577,7 @@ internal class Program
                     Data = data,
                     FilePath = dataWinPath,
                     ScriptPath = scriptPath,
-                    ExePath = Path.Join(Path.GetTempPath(), "DeltaPatcher", chapter, scriptName),
+                    ExePath = Path.Join(ProgramTmpPath, chapter, scriptName),
                     PreChosenDirectory = Path.Join(scriptsPath, chapter, scriptName + "_import")
                 };
 
