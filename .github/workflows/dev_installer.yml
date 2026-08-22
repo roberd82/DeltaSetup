@@ -28,6 +28,26 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Enable apktool bundling and platform select
+        shell: pwsh
+        run: |
+          (Get-Content $env:ISS_FILE) `
+            -replace '^//Source: "apktool\.jar"', 'Source: "apktool.jar"' `
+            -replace 'ShowPlatformSelect = False;', 'ShowPlatformSelect = True;' |
+            Set-Content $env:ISS_FILE
+
+      - name: Verify edits applied
+        shell: pwsh
+        run: |
+          $content = Get-Content $env:ISS_FILE -Raw
+          if ($content -notmatch 'ShowPlatformSelect = True;') {
+            Write-Error "ShowPlatformSelect replace did not apply — check for a rename in setup.iss"
+            exit 1
+          }
+          if ($content -match '^//Source: "apktool\.jar"') {
+            Write-Error "apktool.jar Source line is still commented out"
+            exit 1
+          }
 
       - name: Get latest apktool release and rename jar
         shell: pwsh
@@ -77,27 +97,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Enable apktool bundling and platform select
-        shell: pwsh
-        run: |
-          (Get-Content $env:ISS_FILE) `
-            -replace '^//Source: "apktool\.jar"', 'Source: "apktool.jar"' `
-            -replace 'ShowPlatformSelect = False;', 'ShowPlatformSelect = True;' |
-            Set-Content $env:ISS_FILE
-      - name: Verify edits applied
-        shell: pwsh
-        run: |
-          $content = Get-Content $env:ISS_FILE -Raw
-          if ($content -notmatch 'ShowPlatformSelect = True;') {
-            Write-Error "ShowPlatformSelect replace did not apply — check for a rename in setup.iss"
-            exit 1
-          }
-          if ($content -match '^//Source: "apktool\.jar"') {
-            Write-Error "apktool.jar Source line is still commented out"
-            exit 1
-          }
-      - name: Get latest apktool release and rename jar
-        shell: pwsh
 
       - name: Move "latest" tag to this commit
         run: |
