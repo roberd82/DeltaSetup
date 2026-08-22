@@ -168,10 +168,9 @@ internal class Program
                     var tmpDir = Path.Join(Path.GetTempPath(), "DeltaPatcher");
                     DeleteDirectoryNoReadOnly(tmpDir, true);
                     
-                    foreach (var file in _filesToPatch)
+                    foreach (var (chapter, value) in _filesToPatch)
                     {
-                        var chapter = file.Key;
-                        var fileName = chapter == "Menu" ? "selector" : file.Value;
+                        var fileName = chapter == "Menu" ? "selector" : value;
                         
                         var chWorkDir = Path.Join(tmpDir, fileName);      // work dir for the current pack
                         var chAssetsDir = Path.Join(chWorkDir, "assets");   // assets dir in work dir
@@ -529,9 +528,11 @@ internal class Program
 
     private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin)
     {
+        var dataWinPath = Path.Combine(gamePath, dataWin);
+        UndertaleData data = null;
+
         try
         {
-            var dataWinPath = Path.Combine(gamePath, dataWin);
             var scriptList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
                             ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
                             : [Path.Join(chapter, "Fix")];   // fallback
@@ -543,42 +544,36 @@ internal class Program
             if (_addBorders && File.Exists(Path.Combine(scriptsPath, chapter, "borders.csx")))
                 scriptList.Insert(0, Path.Combine(chapter, "borders"));
 
+            if (!File.Exists(dataWinPath))
+                throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");
+            
+            WriteLine(LocalizedText.ApplyPatch6);
+            await using (var fileStream = File.OpenRead(dataWinPath))
+            {
+                data = UndertaleIO.Read(fileStream);
+            }
+            WriteLine(LocalizedText.ApplyPatch7);
+            
+            if (File.Exists(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt")))
+            {
+                // append MoreCodeChanges.txt to CodeChanges if exists
+                var codePath = Path.Join(scriptsPath, chapter, "CodeChanges.txt");
+                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"));
+                var codeChanges = "";
+                if (File.Exists(codePath))
+                    codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
+                await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
+            }
+
             foreach (var scriptName in scriptList)
             {
-                if (File.Exists(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"))) {
-                    // append MoreCodeChanges.txt to CodeChanges if exists
-                    var codePath = Path.Join(scriptsPath, chapter, "CodeChanges.txt");
-                    var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"));
-                    var codeChanges = "";
-                    if (File.Exists(codePath))
-                        codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
-                    await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
-                }
                 var scriptPath = Path.Join(scriptsPath, scriptName + ".csx");
                 WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
 
-                if (!File.Exists(dataWinPath))
-                {
-                    throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");
-                }
-
                 if (!File.Exists(scriptPath))
-                {
                     throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");
-                }
-
-                WriteLine(LocalizedText.ApplyPatch6);
-                
-                UndertaleData data;
-                await using (var fileStream = File.OpenRead(dataWinPath))
-                {
-                    data = UndertaleIO.Read(fileStream);
-                }
-
-                WriteLine(LocalizedText.ApplyPatch7);
                 
                 var script = await File.ReadAllTextAsync(scriptPath);
-
                 ScriptGlobals scriptGlobals = new()
                 {
                     Data = data,
@@ -613,20 +608,15 @@ internal class Program
                                                      baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
                 await CSharpScript.RunAsync(script, _scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
 
-                WriteLine(LocalizedText.ApplyPatch8);
-
-                await using (var fileStream = FileCreateNoReadOnly(dataWinPath))
-                {
-                    UndertaleIO.Write(fileStream, data);
-                }
-
                 scriptGlobals.Data = null;
-                data.Dispose();
-
-                GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
             }
+            
+            WriteLine(LocalizedText.ApplyPatch8);
+            await using (var fileStream = FileCreateNoReadOnly(dataWinPath))
+            {
+                UndertaleIO.Write(fileStream, data);
+            }
+
             WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
         }
         catch (Exception ex)
@@ -641,6 +631,13 @@ internal class Program
             }
 
             throw;
+        }
+        finally
+        {
+            data?.Dispose();
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
     }
 }
