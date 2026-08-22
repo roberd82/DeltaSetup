@@ -3,11 +3,14 @@ using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Reflection;
 using System.Runtime;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
 using UndertaleModLib;
+using UndertaleModLib.Project;
 using UndertaleModLib.Scripting;
 
 namespace DeltaPatcherCLI;
@@ -23,6 +26,7 @@ internal class Program
     }
 
     public static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+    public static readonly string ProgramTmpPath = Path.Join(Path.GetTempPath(), "DeltaPatcher");
 
     private static ScriptOptions _scriptOptions;
     private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
@@ -30,11 +34,12 @@ internal class Program
     private static bool _writeOutputToFile = true;
     private static DataWinMode _winMode = DataWinMode.Windows;
     private static bool _makeBackups;
+    private static bool _addBorders;
     private static string DataName => _winMode switch
     {
         DataWinMode.Windows => "data.win",
         DataWinMode.Mac => "game.ios", // < common on macOS, iOS and tvOS runners
-        DataWinMode.Droid => "game.droid",
+        DataWinMode.Droid => "data.win",
         DataWinMode.Console => "game.win", // < common on Switch, PS4, PS5 and Xbox GDK runners
         _ => throw new InvalidOperationException("DataWinMode value is out of range")
     };
@@ -42,6 +47,7 @@ internal class Program
 
     private static async Task Main(string[] args)
     {
+        DeleteDirectoryNoReadOnly(ProgramTmpPath, true);    // fully fresh start
         var gamePath = "";
         var scriptsPath = "";
 
@@ -79,6 +85,9 @@ internal class Program
                     case "--make-backups":
                         _makeBackups = true;
                         break;
+                    case "--borders":
+                        _addBorders = true;
+                        break;
                     case "--files" when i + 1 < args.Length: 
                         _filesToPatch = [];
                         foreach (var entry in args[++i].Split(","))
@@ -86,7 +95,7 @@ internal class Program
                             var lower = entry.ToLower().Trim();
                             if (lower is "menu" or "chapter_select" or "selector" or "chapter0" or "ch0")
                             {
-                                _filesToPatch.TryAdd("Menu", (_winMode == DataWinMode.Droid) ? "selector" : "");
+                                _filesToPatch.TryAdd("Menu", "");
                             }
                             else if ((lower.StartsWith("chapter") || lower.StartsWith("ch")) && char.IsDigit(lower[^1]))
                             {
@@ -121,12 +130,14 @@ internal class Program
             _scriptOptions = ScriptOptions.Default
                             .AddImports("UndertaleModLib", "UndertaleModLib.Models",
                                         "UndertaleModLib.Compiler", "UndertaleModLib.Decompiler",
+                                        "UndertaleModLib.Util", "ImageMagick",
                                         "System", "System.IO", "System.Collections.Generic",
                                         "System.Text.RegularExpressions")
                             .AddReferences(typeof(UndertaleObject).GetTypeInfo().Assembly,
                                            typeof(Program).GetTypeInfo().Assembly,
                                            typeof(System.Text.RegularExpressions.Regex).GetTypeInfo().Assembly,
-                                           typeof(Underanalyzer.Decompiler.DecompileContext).Assembly)
+                                           typeof(Underanalyzer.Decompiler.DecompileContext).Assembly,
+                                           typeof(ImageMagick.MagickImage).GetTypeInfo().Assembly)
                             .WithFileEncoding(Encoding.UTF8);
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(false);
@@ -137,79 +148,63 @@ internal class Program
                 {
                     var apktoolPath = Path.Join(Path.GetTempPath(), "apktool.jar");
                     if (!File.Exists(apktoolPath))
-                    {
+                        // check besides executable if not in temp directory
                         apktoolPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath)!, "apktool.jar");
-                    }
 
-                    var files = new DirectoryInfo(gamePath).GetFiles("selector.apk")
-                        .Concat(new DirectoryInfo(gamePath).GetFiles("selector.pack"))
-                        .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.apk"))
-                        .Concat(new DirectoryInfo(gamePath).GetFiles("chapter?_windows.pack"))
-                        .ToArray();
-
+                    if (!File.Exists(apktoolPath))
+                        // can't proceed without apktool
+                        throw new FileNotFoundException("ERROR: apktool.jar not present!");
+                    
                     if (_filesToPatch is null)
+                        // if it's null, that means the user didn't specify anything with --files, so patch every available file
+                        FindPresentChapters(gamePath);
+
+                    // copy modifications needed for android and overwrite the default files
+                    if (Directory.Exists(Path.Join(scriptsPath, "android")))
+                        CopyDirectory(Path.Join(scriptsPath, "android"), Path.Join(scriptsPath));
+                    
+                    // since you already need to go to your game folder for deltaquick, putting the output folder there is fine
+                    var outputDir = Path.Join(gamePath, "packs");
+                    Directory.CreateDirectory(outputDir);
+                    
+                    foreach (var (chapter, value) in _filesToPatch)
                     {
-                        _filesToPatch = [];
-                        foreach (var file in files)
+                        var fileName = chapter == "Menu" ? "selector" : value;
+                        
+                        var chWorkDir = Path.Join(ProgramTmpPath, fileName);    // work dir for the current pack
+                        var chAssetsDir = Path.Join(chWorkDir, "assets");       // assets dir in work dir
+                        var dataPath = Path.Join(chAssetsDir, "data.win");
+                        Directory.CreateDirectory(chWorkDir);
+                        
+                        if (chapter == "Menu")
                         {
-                            var split = file.Name.Split(".");
-                            _filesToPatch.TryAdd(
-                                split[0] == "selector"
-                                    ? "Menu"
-                                    : split[0].Replace("chapter", "Chapter").Replace("_windows", ""),
-                                file.Name);
+                            Directory.CreateDirectory(chAssetsDir);
+                            File.Copy(Path.Join(gamePath, "data.win"), dataPath);
+                            // it appears to be working without the lib folder, so for now it gets commented out
+                            //Directory.CreateDirectory(Path.Join(chWorkDir, "lib"));
+                            //ExtractEmbeddedZip("lib.zip", Path.Join(chWorkDir, "lib"));
                         }
-                    }
-                    else
-                    {
-                        // check if selected files actually exist and add file extensions
-                        for (var i = _filesToPatch.Count - 1; i >= 0; i--)
+                        else
                         {
-                            var key = _filesToPatch.GetAt(i).Key;
-                            var match = false;
-                            foreach (var file in files)
-                            {
-                                var split = file.Name.Split(".");
-                                if (_filesToPatch[key] != split[0])
-                                {
-                                    continue;
-                                }
-                                _filesToPatch[key] += $".{split[1]}";
-                                match = true;
-                                break;
-                            }
-
-                            if (!match)
-                            {
-                                _filesToPatch.RemoveAt(i);
-                            }
+                            CopyDirectory(Path.Join(gamePath, fileName), chAssetsDir);
+                            DeleteDirectoryNoReadOnly(Path.Join(chAssetsDir, "vid"), true);
                         }
+                        
+                        await ApplyChapterPatch(chAssetsDir, scriptsPath, chapter, "data.win");
+                        File.Move(dataPath, Path.Join(chAssetsDir, "game.droid"));
+                        
+                        var yml = ReadEmbeddedText("apktool.yml") + "\napkFileName: " + fileName + ".pack";
+                        var xml = ReadEmbeddedText("AndroidManifest.xml");
+                        if (chapter == "Menu")
+                            xml = xml.Replace("android:largeHeap=\"true\"", "");
+                        
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "apktool.yml"), yml);
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), xml);
+                        
+                        RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, fileName)}.pack\"");
+                        
+                        DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }
-
-                    var translatedPath = Path.Join(gamePath, "translated");
-                    if (!Directory.Exists(translatedPath))
-                    {
-                        Directory.CreateDirectory(translatedPath);
-                    }
-
-                    foreach (var file in _filesToPatch)
-                    {
-                        var fileName = file.Value.Replace(".apk", "").Replace(".pack", "");
-                        var jarOutDir = Path.Join(gamePath, fileName);
-                        var assetsDir = Path.Join(fileName, "assets");
-
-                        if (_makeBackups) {
-                            MakeBackup(gamePath, file.Value);
-                        }
-
-                        RunCommand("java", "-jar " + $"{apktoolPath} d -r \"{Path.Join(gamePath, file.Value)}\" -o \"{jarOutDir}\" -f");
-                        await ApplyChapterPatch(gamePath, scriptsPath, file.Key, $"{Path.Join(assetsDir, DataName)}");
-                        RunCommand("java", "-jar " + $"{apktoolPath} b \"{jarOutDir}\" -o \"{Path.Join(translatedPath, file.Value)}\"");
-
-                        // Theoretically, it shouldn't be read-only, because it was created by "apktool"
-                        DeleteDirectoryNoRO(jarOutDir, true);
-                    }
-
                     break;
                 }
                 case DataWinMode.Mac:
@@ -221,24 +216,8 @@ internal class Program
                     }
 
                     if (_filesToPatch is null)
-                    {
                         // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        _filesToPatch = [];
-                        if (File.Exists(Path.Join(gamePath, DataName)))
-                        {
-                            _filesToPatch.TryAdd("Menu", "");
-                        }
-
-                        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_mac"))
-                        {
-                            if (!File.Exists(Path.Join(dir, DataName)))
-                            {
-                                continue;
-                            }
-                            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-                            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_mac", ""), dirName);
-                        }
-                    }
+                        FindPresentChapters(gamePath, "_mac");
                 
                     foreach (var file in _filesToPatch) {
                         var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
@@ -252,6 +231,7 @@ internal class Program
                 }
                 case DataWinMode.Console:
                 {
+                    _addBorders = false; // should already be present?
                     // TODO: prompt the user to choose an nsz or somehow dump the game's RomFS here..?????
 
                     if (_filesToPatch is null)
@@ -297,24 +277,8 @@ internal class Program
                 default:
                 {
                     if (_filesToPatch is null)
-                    {
                         // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        _filesToPatch = [];
-                        if (File.Exists(Path.Join(gamePath, DataName)))
-                        {
-                            _filesToPatch.TryAdd("Menu", "");
-                        }
-
-                        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?_windows"))
-                        {
-                            if (!File.Exists(Path.Join(dir, DataName)))
-                            {
-                                continue;
-                            }
-                            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-                            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace("_windows", ""), dirName);
-                        }
-                    }
+                        FindPresentChapters(gamePath);
                 
                     foreach (var file in _filesToPatch) {
                         var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
@@ -386,8 +350,40 @@ internal class Program
             Environment.Exit(2);
         }
     }
+
+    private static void FindPresentChapters(string gamePath, string suffix = "_windows")
+    {
+        _filesToPatch = [];
+        if (File.Exists(Path.Join(gamePath, DataName)))
+            _filesToPatch.TryAdd("Menu", "");
+
+        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?" + suffix))
+        {
+            if (!File.Exists(Path.Join(dir, DataName)))
+                continue;
+            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
+            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace(suffix, ""), dirName);
+        }
+    }
     
-    private static void RunCommand(string fileName, string arguments)
+    private static Stream GetEmbeddedFileStream(string resourceName) =>
+        Assembly.GetExecutingAssembly().GetManifestResourceStream($"DeltaPatcherCLI.{resourceName}")
+        ?? throw new FileNotFoundException($"Resource '{resourceName}' not found.");
+
+    private static string ReadEmbeddedText(string resourceName)
+    {
+        using var reader = new StreamReader(GetEmbeddedFileStream(resourceName));
+        return reader.ReadToEnd();
+    }
+    
+    /*private static void ExtractEmbeddedZip(string resourceName, string destinationDirectory)
+     {
+        using var stream = GetEmbeddedFileStream(resourceName);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        archive.ExtractToDirectory(destinationDirectory);
+    }*/
+    
+    private static void RunCommand(string fileName, string arguments = "")
     {
         var startInfo = new ProcessStartInfo
         {
@@ -402,9 +398,10 @@ internal class Program
         process?.WaitForExit();
     }
 
-    private static void MakeBackup(string path, string file) {
+    private static void MakeBackup(string path, string file)
+    {
         var sourcePath = Path.Join(path, file);
-        FileCopyNoRO(sourcePath, sourcePath + ".bak", true);
+        FileCopyNoReadOnly(sourcePath, sourcePath + ".bak", true);
     }
 
     public static void WriteLine(string line = null, bool onlyToFile = false)
@@ -456,20 +453,39 @@ internal class Program
             WriteLine($"{LocalizedText.ReadonlyWarningDir} \"{Path.GetDirectoryName(path)}\".");
         }
     }
-    public static void FileCopyNoRO(string sourceFileName, string destFileName, bool overwrite = false)
+    public static void FileCopyNoReadOnly(string sourceFileName, string destFileName, bool overwrite = false)
     {
         RemoveReadOnlyAttr(destFileName);
         File.Copy(sourceFileName, destFileName, overwrite);
     }
-    public static FileStream FileCreateNoRO(string filePath)
+    public static FileStream FileCreateNoReadOnly(string filePath)
     {
         RemoveReadOnlyAttr(filePath);
         return File.Create(filePath);
     }
-    public static void DeleteDirectoryNoRO(string dirPath, bool recursive = false)
+    public static void DeleteDirectoryNoReadOnly(string dirPath, bool recursive = false)
     {
+        if (!Directory.Exists(dirPath))
+            return;
         RemoveReadOnlyAttr(dirPath, isDirectory: true);
         Directory.Delete(dirPath, recursive);
+    }
+
+    public static void CopyDirectory(string sourceDir, string destDir)
+    {
+        Directory.CreateDirectory(destDir);
+
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var destFile = Path.Combine(destDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: true);
+        }
+
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
+            CopyDirectory(dir, destSubDir);
+        }
     }
 
     private static bool ValidatePaths(string gamePath, string scriptsPath)
@@ -510,77 +526,94 @@ internal class Program
 
     private static async Task ApplyChapterPatch(string gamePath, string scriptsPath, string chapter, string dataWin)
     {
+        var dataWinPath = Path.Combine(gamePath, dataWin);
+        UndertaleData data = null;
+
         try
         {
-            var dataWinPath = Path.Combine(gamePath, dataWin);
-            var scriptPath = Path.Combine(scriptsPath, chapter, "Fix.csx");
+            var scriptList = File.Exists(Path.Combine(scriptsPath, chapter, "scripts.json"))
+                            ? JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(Path.Combine(scriptsPath, chapter, "scripts.json")))
+                            : [Path.Join(chapter, "Fix")];   // fallback
 
             WriteLine();
             WriteLine($"===== {LocalizedText.ApplyPatch1} {chapter.ToUpper()} =====");
             WriteLine($"{LocalizedText.ApplyPatch2} {dataWinPath}");
-            WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
+
+            if (_addBorders && File.Exists(Path.Combine(scriptsPath, chapter, "borders.csx")))
+                scriptList.Insert(0, Path.Combine(chapter, "borders"));
 
             if (!File.Exists(dataWinPath))
-            {
                 throw new FileNotFoundException($"{LocalizedText.ApplyPatch4} {dataWinPath}");
-            }
-
-            if (!File.Exists(scriptPath))
-            {
-                throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");
-            }
-
-            WriteLine(LocalizedText.ApplyPatch6);
             
-            UndertaleData data;
+            WriteLine(LocalizedText.ApplyPatch6);
             await using (var fileStream = File.OpenRead(dataWinPath))
             {
                 data = UndertaleIO.Read(fileStream);
             }
-
             WriteLine(LocalizedText.ApplyPatch7);
             
-            var script = await File.ReadAllTextAsync(scriptPath);
-
-            ScriptGlobals scriptGlobals = new()
+            if (File.Exists(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt")))
             {
-                Data = data,
-                FilePath = dataWinPath,
-                ScriptPath = scriptPath
-            };
+                // append MoreCodeChanges.txt to CodeChanges if exists
+                var codePath = Path.Join(scriptsPath, chapter, "CodeChanges.txt");
+                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"));
+                var codeChanges = "";
+                if (File.Exists(codePath))
+                    codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
+                await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
+            }
 
-            object prop = scriptGlobals.Data;
-            prop = scriptGlobals.FilePath;
-            prop = scriptGlobals.ScriptPath;
-            scriptGlobals.ScriptMessage(null, true);
-            scriptGlobals.ScriptWarning(null, true);
-            scriptGlobals.ScriptError(null, true);
-            scriptGlobals.MainThreadAction(() => { });
-            scriptGlobals.SetProgressBar(null, null, -1, -1);
-            scriptGlobals.UpdateProgressValue(-1);
-            scriptGlobals.IncrementProgress();
-            scriptGlobals.GetProgress();
-            scriptGlobals.ShowMessage(null, true);
-            scriptGlobals.ShowWarning(null, true);
-            new ScriptGlobals.ScriptException("abc");
+            foreach (var scriptName in scriptList)
+            {
+                var scriptPath = Path.Join(scriptsPath, scriptName + ".csx");
+                WriteLine($"{LocalizedText.ApplyPatch3} {scriptPath}");
 
-            SourceFileResolver srcResolver = new(searchPaths: ImmutableArray<string>.Empty,
-                                                 baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
-            await CSharpScript.RunAsync(script, _scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
+                if (!File.Exists(scriptPath))
+                    throw new FileNotFoundException($"{LocalizedText.ApplyPatch5} {scriptPath}");
+                
+                var script = await File.ReadAllTextAsync(scriptPath);
+                ScriptGlobals scriptGlobals = new()
+                {
+                    Data = data,
+                    FilePath = dataWinPath,
+                    ScriptPath = scriptPath,
+                    ExePath = Path.Join(ProgramTmpPath, chapter, scriptName),
+                    PreChosenDirectory = Path.Join(scriptsPath, chapter, scriptName + "_import")
+                };
 
+                object prop = scriptGlobals.Data;
+                prop = scriptGlobals.FilePath;
+                prop = scriptGlobals.ScriptPath;
+                prop = scriptGlobals.ExePath;
+                prop = scriptGlobals.PreChosenDirectory;
+                prop = scriptGlobals.Project;
+                scriptGlobals.ScriptMessage(null, true);
+                scriptGlobals.ScriptWarning(null, true);
+                scriptGlobals.ScriptError(null, true);
+                scriptGlobals.MainThreadAction(() => { });
+                scriptGlobals.SetProgressBar(null, null, -1, -1);
+                scriptGlobals.UpdateProgressValue(-1);
+                scriptGlobals.IncrementProgress();
+                scriptGlobals.GetProgress();
+                scriptGlobals.ShowMessage(null, true);
+                scriptGlobals.ShowWarning(null, true);
+                scriptGlobals.EnsureDataLoaded();
+                scriptGlobals.ScriptQuestion(null);
+                scriptGlobals.PromptChooseDirectory();
+                new ScriptGlobals.ScriptException("abc");
+
+                SourceFileResolver srcResolver = new(searchPaths: ImmutableArray<string>.Empty,
+                                                     baseDirectory: Path.GetDirectoryName(Path.GetFullPath(scriptPath)));
+                await CSharpScript.RunAsync(script, _scriptOptions.WithSourceResolver(srcResolver), globals: scriptGlobals);
+
+                scriptGlobals.Data = null;
+            }
+            
             WriteLine(LocalizedText.ApplyPatch8);
-
-            await using (var fileStream = FileCreateNoRO(dataWinPath))
+            await using (var fileStream = FileCreateNoReadOnly(dataWinPath))
             {
                 UndertaleIO.Write(fileStream, data);
             }
-
-            scriptGlobals.Data = null;
-            data.Dispose();
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
 
             WriteLine($"- {chapter} {LocalizedText.ApplyPatch9}");
         }
@@ -597,6 +630,13 @@ internal class Program
 
             throw;
         }
+        finally
+        {
+            data?.Dispose();
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
     }
 }
 
@@ -611,8 +651,21 @@ public class ScriptGlobals
     public UndertaleData Data { get; set; }
     public string FilePath { get; set; }
     public string ScriptPath { get; set; }
+    public string ExePath { get; set; }                     // set what path the script should treat as the "ExePath"
 
     public Action<Action> MainThreadAction => static (f) => f();
+
+    public void EnsureDataLoaded()
+    {
+        if (Data is null) throw new ScriptException("No data file is currently loaded!");
+    }
+    
+    public ProjectContext Project => null;
+
+    public bool ScriptQuestion(string message) => true;     // always answer yes to proceed with the script
+
+    public string PreChosenDirectory { get; set; }          // pre-set a directory in case the script asks for one
+    public string PromptChooseDirectory() => string.IsNullOrWhiteSpace(PreChosenDirectory) ? null : PreChosenDirectory;
 
     public void ScriptMessage(string message, bool dummy = false)
     {

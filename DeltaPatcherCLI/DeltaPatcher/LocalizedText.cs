@@ -27,7 +27,7 @@
         public const string ValidatePath8 	    = "Error checking paths:";
         public const string ApplyPatch1 	    = "PATCHING:";
         public const string ApplyPatch2 	    = "- Game file:";
-        public const string ApplyPatch3 	    = "- Patch script:";
+        public const string ApplyPatch3 	    = "Patch script:";
         public const string ApplyPatch4 	    = "Game file not found:";
         public const string ApplyPatch5 	    = "Patch script not found:";
         public const string ApplyPatch6 	    = "- Reading data.win...";

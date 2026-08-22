@@ -4,7 +4,7 @@ This is the source code for the DELTARUNE Translation installer by LazyDesman. I
 
 # How to build it?
 
-(The pre-built version in the Releases tab automatically gets recompiled on every update. It installs the mod, and downloads the English localization files. This is provided, so translation developers can install the mod if they haven't made their own installers already. ATTENTION: THE LANG FOLDER IN THE GAME FILES WILL BE OVERRIDDEN DURING INSTALL, BE CAREFUL TO NOT LOSE ANY DATA!)
+(The pre-built version in the Releases tab automatically gets recompiled on every update. It installs the mod, and downloads the English localization files. This is provided, so translation developers can install the mod if they haven't made their own installers already. ATTENTION: THE LANG FOLDER IN THE GAME FILES WILL BE OVERRIDDEN DURING INSTALL (if not turned off in the "Advanced" settings), BE CAREFUL TO NOT LOSE ANY DATA!)
 
 - First, download this repo and open `DeltaPatcherCLI.csproj` and `LocalizedText.cs` in Visual Studio or any other text editor.
 
@@ -34,10 +34,10 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER!
 
 - Optionally, change `ScriptsURL` and `ScriptsURLMirror` to your download links if you want to share them by yourself (and be indepedent from possible updates).
 
-- if you want the installer to support DeltaQuick do these things as well:
-    - Download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `setup.iss`
-    - uncomment the line `Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall` in the \[Files\] section
-    - set `ShowDeltaquickCheckmark` from `false` to `true` in the beginning of the \[Code\] section
+- if you want the installer to support other platforms besides Windows, do these things as well:
+    - For android (DeltaQuick) download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `setup.iss` and uncomment the line `Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall` in the \[Files\] section
+    - set `ShowPlatformSelect` from `False` to `True` in the beginning of the \[Code\] section
+    - in `procedure InitPlatforms` uncomment the platforms you want to support
 
 - And finally, compile the installer in Inno Setup.
 
@@ -51,12 +51,10 @@ If you rename your translation archive to `lang.7z`, download the `scripts.7z` a
 
 IMPORTANT! YOU HAVE THO HAVE [JAVA JRE](https://adoptium.net/temurin/releases) INSTALLED AND IN YOUR PATH!
 
-The translation mod gets applied on-top of the DeltaQuick patches, so you first need to get those.
+- select "Android" in the platform select drop-down menu
+- point the installer to your unmodified Windows DELTARUNE installation
+- the output will be in the `packs` folder in the game installation folder, and the `lang` folder will be also here like normal
+- bring over the game files along with the lang folder and the packs folder to your phone
 - Download [DeltaQuick](https://play.google.com/store/apps/details?id=com.bookerpuzzle.deltaquick&pcampaignid=web_share), and follow the instructions for it
-- After you finished, extract the .apk or .pack files from the `packs` folder with the save file manager
-- Bring them over to your PC, run the installer, and check the checkbox on the second page
-- On the third page point the installer to the folder you put the .apk or .pack files in
-- Go through the installer like normal, the patched files files will be in a new folder called `translated`, and the `lang` folder beside it
-- Compress back the `lang` folder to a .zip file this time, then bring it and the .apk files back to your phone
-- With the save file manager load the new patched files back to the `packs` folder, and the `lang.zip` to the root folder
+- after you finished, open the save file manager and load the full `lang` and `packs` folders to the root folder
 - Done!

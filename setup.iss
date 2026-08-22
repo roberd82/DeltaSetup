@@ -1,8 +1,8 @@
 [Setup]
 AppName=DELTARUNE (your lang) Translation Installer
-AppVersion=1.6.2
+AppVersion=1.7.0
 AppPublisher=LazyDesman
-DefaultDirName={autopf}\DELTARUNE Translation Patch
+//DefaultDirName={autopf}\DELTARUNE Translation Patch
 OutputBaseFilename=DeltaruneTranslationInstaller
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -10,7 +10,7 @@ SetupIconFile=icon.ico
 WizardStyle=modern dynamic
 ArchitecturesAllowed=x64
 ArchitecturesInstallIn64BitMode=x64
-DisableDirPage=yes
+//DisableDirPage=yes
 DisableWelcomePage=no
 WizardSmallImageFile=logo.bmp
 WizardImageFile=banner.bmp
@@ -19,6 +19,10 @@ WizardImageFileDynamicDark=banner.bmp
 // SetupLogging=True
 ShowLanguageDialog=yes
 UsePreviousLanguage=no
+WizardSizePercent=130,130
+// this makes DefaultDirName and DisableDirPage not matter
+CreateAppDir=no
+Uninstallable=no
 
 [Languages]
 Name: "tr"; MessagesFile: "compiler:Default.isl"
@@ -78,7 +82,6 @@ tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of d
 tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of the bundled version?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
-tr.DeltaQuick1= Apply the translation mod to DeltaQuick files.
 tr.PatchSelectPage1=Select Files to Patch
 tr.PatchSelectPage2=Menu
 tr.PatchSelectPage3=Chapter
@@ -86,6 +89,12 @@ tr.PatchSelectPage4=Only install the selected patches:
 tr.PatchSelectPage5=Skip downloading language files
 tr.PatchSelectPage6=Back up original files
 tr.AdvancedButtonText=Advanced
+tr.PlatformLabel1=Select the target platform:
+tr.PlatformWindows=Windows
+tr.PlatformAndroid=Android (DeltaQuick)
+tr.PlatformConsole=Console
+tr.PlatformMac=Mac
+tr.BordersCheckbox=Add console-exclusive borders
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -99,7 +108,14 @@ const
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
   DeltaruneSteamAppId = '1671210';
-  ShowDeltaquickCheckmark = False;
+  ShowPlatformSelect = False;
+type
+TPlatformInfo = record
+  MessageKey: String;         // key in [CustomMessages] for the dropdown label
+  CliFlag: String;            // extra argument for DeltaPatcherCLI.exe ('' = none)
+  RequiresGamePath: Boolean;  // True if the installer should search for the game
+  ForceBorders: Boolean;      // True to force the --borders argument, False to let the user chose (if the checkbox is visible)
+end;
 var
   InfoPage: TOutputMsgWizardPage;
   GamePathPage: TInputDirWizardPage;
@@ -109,13 +125,60 @@ var
   ForceClose: Boolean;
   ExistingDrives: TArrayOfString;
   // a drop-down would be better, but this is fine for now
-  InfoCheckbox: TNewCheckBox;
-  PatchDeltaQuick: Boolean;
+  PlatformLabel: TNewStaticText;
+  PlatformCombo: TNewComboBox;
+  Platforms: array of TPlatformInfo;
+  SelectedPlatform: Integer;
   // expand the array to support more chapters in the future
   ExtraButton: TNewButton;
   FilesToPatch: array[0..5] of Boolean;
   SkipLangFiles: Boolean;
   MakeBackups: Boolean;
+
+  LangLinkLabel: TNewStaticText;
+  ScriptsLinkLabel: TNewStaticText;
+  BordersCheckbox: TNewCheckBox;
+
+procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath, ForceBorders: Boolean);
+var
+  Idx: Integer;
+begin
+  Idx := GetArrayLength(Platforms);
+  SetArrayLength(Platforms, Idx + 1);
+  Platforms[Idx].MessageKey := MessageKey;
+  Platforms[Idx].CliFlag := CliFlag;
+  Platforms[Idx].RequiresGamePath := RequiresGamePath;
+  Platforms[Idx].ForceBorders := ForceBorders;
+end;
+
+// --- Available platforms ---
+// Comment out a line to remove that platform from the dropdown.
+// Order here is the order shown in the dropdown; first entry is the default.
+procedure InitPlatforms;
+begin
+  AddPlatform('PlatformWindows',          '',  True, False);
+  AddPlatform('PlatformAndroid',   '--droid', False,  True);
+  //AddPlatform('PlatformConsole', '--console', False,  True);
+  //AddPlatform('PlatformMac'    ,     '--mac', False, False);
+end;
+
+procedure OpenLinkClick(Sender: TObject);
+var
+  ErrorCode: Integer;
+begin
+  ShellExec('open', TNewStaticText(Sender).Caption, '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+end;
+
+function CreateLinkLabel(AOwner: TWinControl; const URL: String): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(AOwner);
+  Result.Parent := AOwner;
+  Result.Caption := URL;
+  Result.Cursor := crHand;
+  Result.Font.Color := clBlue;
+  Result.Font.Style := [fsUnderline];
+  Result.OnClick := @OpenLinkClick;
+end;
 
 procedure InitExistingDrives;
 var
@@ -444,7 +507,7 @@ begin
     MakeBackupsCheck.Width := PopupForm.ClientWidth - ScaleX(32);
     MakeBackupsCheck.Height := ScaleY(20);
     MakeBackupsCheck.Caption := CustomMessage('PatchSelectPage6');
-    MakeBackupsCheck.Checked := SkipLangFiles;
+    MakeBackupsCheck.Checked := MakeBackups;
 
     OKButton := TNewButton.Create(PopupForm);
     OKButton.Parent := PopupForm;
@@ -484,8 +547,21 @@ begin
   ShowOptionsPopup;
 end;
 
-procedure InitializeWizard;
+procedure UpdatePlatformControls;
 begin
+  BordersCheckbox.Visible := not Platforms[PlatformCombo.ItemIndex].ForceBorders;
+end;
+
+procedure PlatformComboChange(Sender: TObject);
+begin
+  UpdatePlatformControls;
+end;
+
+procedure InitializeWizard;
+var
+  i: Integer;
+begin
+  InitPlatforms;
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
   WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2');
 
@@ -503,22 +579,53 @@ begin
     CustomMessage('wpWelcome10') + #13#10 +
     CustomMessage('wpWelcome11') + #13#10#13#10 +
     CustomMessage('wpWelcome12') + #13#10 +
-    CustomMessage('wpWelcome13') +  #13#10 +
-    LangURL + #13#10 +
-    ScriptsURL
+    CustomMessage('wpWelcome13')
   );
-  if (ShowDeltaquickCheckmark) or ParamExists('/FORCESHOWDELTAQUICK') then
+  LangLinkLabel := CreateLinkLabel(InfoPage.Surface, LangURL);
+  LangLinkLabel.Top := InfoPage.MsgLabel.Top + InfoPage.MsgLabel.Height + ScaleY(4);
+  LangLinkLabel.Left := InfoPage.MsgLabel.Left;
+
+  ScriptsLinkLabel := CreateLinkLabel(InfoPage.Surface, ScriptsURL);
+  ScriptsLinkLabel.Top := LangLinkLabel.Top + LangLinkLabel.Height + ScaleY(4);
+  ScriptsLinkLabel.Left := InfoPage.MsgLabel.Left;
+  if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
   begin
-    InfoCheckbox := TNewCheckBox.Create(InfoPage);
-    with InfoCheckbox do
+    PlatformLabel := TNewStaticText.Create(InfoPage);
+    with PlatformLabel do
     begin
       Parent := InfoPage.Surface;
-      Top := InfoPage.SurfaceHeight - Height - 8; 
       Left := 0;
+      Top := ScriptsLinkLabel.Top + ScriptsLinkLabel.Height + ScaleY(12);
       Width := InfoPage.SurfaceWidth;
-      Caption := CustomMessage('DeltaQuick1');
+      Caption := CustomMessage('PlatformLabel1');
+    end;
+
+    PlatformCombo := TNewComboBox.Create(InfoPage);
+    with PlatformCombo do
+    begin
+      Parent := InfoPage.Surface;
+      Left := 0;
+      Top := PlatformLabel.Top + PlatformLabel.Height + ScaleY(4);
+      Width := InfoPage.SurfaceWidth;
+      Style := csDropDownList;
+      for i := 0 to GetArrayLength(Platforms) - 1 do
+        Items.Add(CustomMessage(Platforms[i].MessageKey));
+      ItemIndex := 0;
+    end;
+
+    PlatformCombo.OnChange := @PlatformComboChange;
+
+    BordersCheckbox := TNewCheckBox.Create(InfoPage);
+    with BordersCheckbox do
+    begin
+      Parent := InfoPage.Surface;
+      Left := 0;
+      Top := PlatformCombo.Top + PlatformCombo.Height + ScaleY(8);
+      Width := InfoPage.SurfaceWidth;
+      Caption := CustomMessage('BordersCheckbox');
       Checked := False;
     end;
+    UpdatePlatformControls;
   end;
 
   ExtraButton := TNewButton.Create(WizardForm);
@@ -559,13 +666,13 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    PatchDeltaQuick := False;
-    if (ShowDeltaquickCheckmark) or ParamExists('/FORCESHOWDELTAQUICK') then
+    SelectedPlatform := 0;
+    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
     begin
-      PatchDeltaQuick := InfoCheckbox.Checked;
+      SelectedPlatform := PlatformCombo.ItemIndex;
     end;
-    
-    if not PatchDeltaQuick then
+
+    if Platforms[SelectedPlatform].RequiresGamePath then
     begin
       FoundGameLoc := FindGameLocation();
       if FoundGameLoc = '' then
@@ -578,7 +685,7 @@ begin
   end
   else if CurPageID = GamePathPage.ID then
   begin
-    if (not CheckDeltaruneLoc(GamePathPage.Values[0])) and (not PatchDeltaQuick) then
+    if (not CheckDeltaruneLoc(GamePathPage.Values[0])) and Platforms[SelectedPlatform].RequiresGamePath then
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
@@ -809,9 +916,20 @@ begin
 
     ArgString := '';
 
-    if PatchDeltaQuick then
+    if Platforms[SelectedPlatform].CliFlag <> '' then
     begin
-      ArgString := ArgString + ' --droid';
+      ArgString := ArgString + ' ' + Platforms[SelectedPlatform].CliFlag;
+    end;
+
+    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
+    begin
+      if Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked then
+        ArgString := ArgString + ' --borders';
+    end
+    else
+    begin
+      if Platforms[SelectedPlatform].ForceBorders then
+        ArgString := ArgString + ' --borders';
     end;
 
     if MakeBackups then

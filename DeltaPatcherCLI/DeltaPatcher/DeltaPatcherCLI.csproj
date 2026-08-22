@@ -36,6 +36,7 @@
     <ProjectReference Include="..\UndertaleModTool\UndertaleModLib\UndertaleModLib.csproj" />
     <TrimmerRootAssembly Include="Underanalyzer" />
     <TrimmerRootAssembly Include="UndertaleModLib" />
+    <TrimmerRootAssembly Include="Magick.NET-Q8-AnyCPU" />
   </ItemGroup>
 
   <ItemGroup>
@@ -49,6 +50,13 @@
     <Message Text="$(PublishDir)UndertaleModLib.xml" Importance="high" />
     <Exec Command="del /F /Q $(PublishDir)UndertaleModLib.xml" IgnoreExitCode="true" />
   </Target>
+
+  <ItemGroup>
+    <EmbeddedResource Include="apktool.yml" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="AndroidManifest.xml" />
+  </ItemGroup>
 
   <PropertyGroup>
     <TrimMode>copyused</TrimMode>
