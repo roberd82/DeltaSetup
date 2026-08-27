@@ -17,12 +17,98 @@ namespace DeltaPatcherCLI;
 
 internal class Program
 {
-    private enum DataWinMode
+    private enum Platforms
     {
         Windows,
         Mac,
+        Linux,
         Droid,
-        Console
+        Switch,
+        Ps4,
+        Ps5,
+        Xbox
+    }
+
+    private class Platform
+    {
+        public readonly Platforms Type;
+        public Platform(Platforms type)     // explicitly state the platform
+        {
+            Type = type;
+        }
+        public Platform(string gamePath)        // detect the platform
+        {
+            // check chapter select for source platform
+            if (File.Exists(Path.Join(gamePath, "data.win")))
+                Type = Platforms.Windows;
+            else if (File.Exists(Path.Join(gamePath, "game.ios")))
+                Type = Platforms.Mac;
+            else if (File.Exists(Path.Join(gamePath, "game.unx")))
+                Type = Platforms.Linux;
+            else if (File.Exists(Path.Join(gamePath, "game.win")))
+            {
+                // determine console variant
+                var foundPlatform = false;
+                foreach (var dir in Directory.GetDirectories(gamePath))
+                {
+                    if (dir.EndsWith("_switch"))
+                    {
+                        Type = Platforms.Switch;
+                        foundPlatform = true;
+                        break;
+                    }
+                    if (dir.EndsWith("_ps4"))
+                    {
+                        Type = Platforms.Ps4;
+                        foundPlatform = true;
+                        break;
+                    }
+                    if (dir.EndsWith("_ps5"))
+                    {
+                        Type = Platforms.Ps5;
+                        foundPlatform = true;
+                        break;
+                    }
+                    if (dir.EndsWith("_xbox"))
+                    {
+                        Type = Platforms.Xbox;
+                        foundPlatform = true;
+                        break;
+                    }
+                }
+                if (!foundPlatform)
+                    throw new FileNotFoundException($"Couldn't determine console variant at {gamePath}");
+            }
+            else
+                throw new FileNotFoundException($"No valid game files found at {gamePath}");
+        }
+        public string DataName => Type switch
+        {
+            Platforms.Windows => "data.win",
+            Platforms.Mac => "game.ios", // < common on macOS, iOS and tvOS runners
+            Platforms.Linux => "game.unx", // maybe one day Toby will make a native linux build like for undertale
+            Platforms.Droid => "game.droid",
+            Platforms.Switch or Platforms.Ps4 or Platforms.Ps5 or Platforms.Xbox => "game.win", // < common on Switch, PS4, PS5 and Xbox GDK runners
+            _ => throw new InvalidOperationException("No DataName associated with platform!")
+        };
+        public string Suffix => Type switch
+        {
+            Platforms.Windows or Platforms.Droid => "_windows",
+            Platforms.Mac => "_mac",
+            Platforms.Linux => "_linux",
+            Platforms.Switch => "_switch",
+            Platforms.Ps4 => "_ps4",
+            Platforms.Ps5 => "_ps5",
+            Platforms.Xbox => "_xbox",
+            _ => throw new InvalidOperationException("No directory suffix associated with platform!")
+        };
+
+        public bool? AddBorders => Type switch
+        {
+            Platforms.Droid => true,    // force borders
+            Platforms.Switch or Platforms.Ps4 or Platforms.Ps5 or Platforms.Xbox => false,  // already has borders
+            _ => null   // user decides
+        };
     }
 
     public static readonly bool IsWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
@@ -32,17 +118,10 @@ internal class Program
     private static readonly string Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
     private static readonly StringBuilder OutputTextBuilder = new();
     private static bool _writeOutputToFile = true;
-    private static DataWinMode _winMode = DataWinMode.Windows;
+    private static Platform _targetPlatform = new(Platforms.Windows);
+    private static Platform SourcePlatform { get => field ?? _targetPlatform; set; }
     private static bool _makeBackups;
     private static bool _addBorders;
-    private static string DataName => _winMode switch
-    {
-        DataWinMode.Windows => "data.win",
-        DataWinMode.Mac => "game.ios", // < common on macOS, iOS and tvOS runners
-        DataWinMode.Droid => "data.win",
-        DataWinMode.Console => "game.win", // < common on Switch, PS4, PS5 and Xbox GDK runners
-        _ => throw new InvalidOperationException("DataWinMode value is out of range")
-    };
     private static OrderedDictionary<string, string> _filesToPatch;      // key: chapter name, value: path to folder the data file is in relative to gamePath
 
     private static async Task Main(string[] args)
@@ -50,6 +129,7 @@ internal class Program
         DeleteDirectoryNoReadOnly(ProgramTmpPath, true);    // fully fresh start
         var gamePath = "";
         var scriptsPath = "";
+        string outputPath = null;
 
         try
         {
@@ -64,23 +144,48 @@ internal class Program
                 {
                     case "--game" when i + 1 < args.Length:
                         gamePath = args[++i];
+                        // fix Mac paths
+                        if (Directory.Exists(Path.Join(gamePath, "DELTARUNE.app")))
+                            gamePath = Path.Join(gamePath, "DELTARUNE.app");
+                        if (Path.GetExtension(gamePath)?.ToLowerInvariant() == ".app")
+                            gamePath = Path.Combine(gamePath, "Contents", "Resources");
+                        else if (File.Exists(Path.Join(gamePath, "assets", "game.unx")))
+                            // just an assumption based on the linux undertale build's structure
+                            gamePath = Path.Join(gamePath, "assets");
                         break;
                     case "--scripts" when i + 1 < args.Length:
-                        scriptsPath = args[++i];
+                        scriptsPath = Path.Join(ProgramTmpPath, "scripts");
+                        CopyDirectory(args[++i], scriptsPath);
                         break;
-                    case "--droid":
-                        _winMode = DataWinMode.Droid;
-                        break;
-                    case "--console":
-                    case "--switch":
-                    case "--ps4":
-                    case "--ps5":
-                        _winMode = DataWinMode.Console;
+                    case "--output" or "-o" when i + 1 < args.Length:
+                        outputPath = args[++i];
                         break;
                     case "--mac":
+                    case "--osx":
                     case "--macos":
                     case "--macosx":
-                        _winMode = DataWinMode.Mac;
+                        _targetPlatform = new Platform(Platforms.Mac);
+                        break;
+                    case "--linux":
+                        _targetPlatform = new Platform(Platforms.Linux);
+                        break;
+                    case "--droid":
+                    case "--android":
+                    case "--deltaquick":
+                        _targetPlatform = new Platform(Platforms.Droid);
+                        break;
+                    case "--switch":
+                    case "--switch2": // maybe the two switch platforms needs to be separate?
+                        _targetPlatform = new Platform(Platforms.Switch);
+                        break;
+                    case "--ps4":
+                        _targetPlatform = new Platform(Platforms.Ps4);
+                        break;
+                    case "--ps5":
+                        _targetPlatform = new Platform(Platforms.Ps5);
+                        break;
+                    case "--xbox":
+                        _targetPlatform = new Platform(Platforms.Xbox);
                         break;
                     case "--make-backups":
                         _makeBackups = true;
@@ -88,24 +193,22 @@ internal class Program
                     case "--borders":
                         _addBorders = true;
                         break;
-                    case "--files" when i + 1 < args.Length: 
+                    case "--files" when i + 1 < args.Length:
                         _filesToPatch = [];
                         foreach (var entry in args[++i].Split(","))
                         {
                             var lower = entry.ToLower().Trim();
                             if (lower is "menu" or "chapter_select" or "selector" or "chapter0" or "ch0")
-                            {
                                 _filesToPatch.TryAdd("Menu", "");
-                            }
                             else if ((lower.StartsWith("chapter") || lower.StartsWith("ch")) && char.IsDigit(lower[^1]))
-                            {
-                                var chNum = lower[^1];
-                                _filesToPatch.TryAdd($"Chapter{chNum}", $"chapter{chNum}_windows");
-                            }
+                                _filesToPatch.TryAdd($"Chapter{lower[^1]}", $"chapter{lower[^1]}");
                         }
+
                         break;
                 }
             }
+
+            outputPath ??= gamePath;
 
             if (string.IsNullOrEmpty(gamePath) || string.IsNullOrEmpty(scriptsPath))
             {
@@ -142,154 +245,109 @@ internal class Program
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(false);
 
-            switch (_winMode)
+            if (_targetPlatform.AddBorders.HasValue)
+                _addBorders = _targetPlatform.AddBorders.Value;
+
+            // preparations
+            switch (_targetPlatform.Type)
             {
-                case DataWinMode.Droid:
-                {
+                case Platforms.Droid:
+                    // determine source platform
+                    SourcePlatform = new Platform(gamePath);
+
+                    // copy game folder to tmp
+                    var tmpGameDir = Path.Join(ProgramTmpPath, "tmpGame");
+                    CopyDirectory(gamePath, tmpGameDir);
+
+                    gamePath = tmpGameDir;
+
+                    // copy modifications needed for android and overwrite the default files
+                    if (Directory.Exists(Path.Join(scriptsPath, "android")))
+                        CopyDirectory(Path.Join(scriptsPath, "android"), scriptsPath);
+                    break;
+                case Platforms.Switch:
+                case Platforms.Ps4:
+                case Platforms.Ps5:
+                case Platforms.Xbox:
+                    // TODO: prompt the user to choose an nsz or somehow dump the game's RomFS here..?????
+                    break;
+            }
+
+            _filesToPatch ??= FindPresentChapters(gamePath);
+
+            foreach (var (chapter, value) in _filesToPatch)
+            {
+                var dataWin = value == ""
+                    ? SourcePlatform.DataName
+                    : Path.Join(value + SourcePlatform.Suffix, SourcePlatform.DataName);
+                if (_makeBackups)
+                    MakeBackup(gamePath, dataWin);
+                await ApplyChapterPatch(gamePath, scriptsPath, chapter, dataWin);
+            }
+
+            // post-patch actions
+            switch (_targetPlatform.Type)
+            {
+                case Platforms.Droid:
                     var apktoolPath = Path.Join(Path.GetTempPath(), "apktool.jar");
                     if (!File.Exists(apktoolPath))
                         // check besides executable if not in temp directory
-                        apktoolPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath)!, "apktool.jar");
+                        apktoolPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath), "apktool.jar");
 
                     if (!File.Exists(apktoolPath))
                         // can't proceed without apktool
                         throw new FileNotFoundException("ERROR: apktool.jar not present!");
                     
-                    if (_filesToPatch is null)
-                        // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        FindPresentChapters(gamePath);
-
-                    // copy modifications needed for android and overwrite the default files
-                    if (Directory.Exists(Path.Join(scriptsPath, "android")))
-                        CopyDirectory(Path.Join(scriptsPath, "android"), Path.Join(scriptsPath));
-                    
-                    // since you already need to go to your game folder for deltaquick, putting the output folder there is fine
-                    var outputDir = Path.Join(gamePath, "packs");
+                    var outputDir = Path.Join(outputPath, "packs");
                     Directory.CreateDirectory(outputDir);
-                    
+                    var yml = ReadEmbeddedText("apktool.yml");
+                    var xml = ReadEmbeddedText("AndroidManifest.xml");
                     foreach (var (chapter, value) in _filesToPatch)
                     {
-                        var fileName = chapter == "Menu" ? "selector" : value;
+                        var fileName = chapter == "Menu" ? "selector" : value + _targetPlatform.Suffix;
                         
                         var chWorkDir = Path.Join(ProgramTmpPath, fileName);    // work dir for the current pack
                         var chAssetsDir = Path.Join(chWorkDir, "assets");       // assets dir in work dir
-                        var dataPath = Path.Join(chAssetsDir, "data.win");
+                        var dataPath = Path.Join(chAssetsDir, _targetPlatform.DataName);
                         Directory.CreateDirectory(chWorkDir);
                         
                         if (chapter == "Menu")
                         {
                             Directory.CreateDirectory(chAssetsDir);
-                            File.Copy(Path.Join(gamePath, "data.win"), dataPath);
+                            File.Move(Path.Join(gamePath, SourcePlatform.DataName), dataPath);
                             // it appears to be working without the lib folder, so for now it gets commented out
                             //Directory.CreateDirectory(Path.Join(chWorkDir, "lib"));
                             //ExtractEmbeddedZip("lib.zip", Path.Join(chWorkDir, "lib"));
                         }
                         else
                         {
-                            CopyDirectory(Path.Join(gamePath, fileName), chAssetsDir);
+                            Directory.Move(Path.Join(gamePath, value + SourcePlatform.Suffix), chAssetsDir);
+                            File.Move(Path.Join(chAssetsDir, SourcePlatform.DataName),
+                                Path.Join(chAssetsDir, _targetPlatform.DataName));
                             DeleteDirectoryNoReadOnly(Path.Join(chAssetsDir, "vid"), true);
                         }
                         
-                        await ApplyChapterPatch(chAssetsDir, scriptsPath, chapter, "data.win");
-                        File.Move(dataPath, Path.Join(chAssetsDir, "game.droid"));
+                        foreach (var bak in Directory.GetFiles(chAssetsDir, "*.bak"))
+                            File.Delete(bak);
                         
-                        var yml = ReadEmbeddedText("apktool.yml") + "\napkFileName: " + fileName + ".pack";
-                        var xml = ReadEmbeddedText("AndroidManifest.xml");
-                        if (chapter == "Menu")
-                            xml = xml.Replace("android:largeHeap=\"true\"", "");
-                        
-                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "apktool.yml"), yml);
-                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), xml);
-                        
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "apktool.yml"),
+                            yml + "\napkFileName: " + fileName + ".pack");
+                        await File.WriteAllTextAsync(Path.Join(chWorkDir, "AndroidManifest.xml"), 
+                            chapter == "Menu" && _filesToPatch.Count > 1
+                                    ? xml.Replace("android:largeHeap=\"true\"", "")
+                                    : xml);
                         RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, fileName)}.pack\"");
                         
                         DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }
-                    break;
-                }
-                case DataWinMode.Mac:
-                {
-                    // if the user typed DELTARUNE.app as the path, append Contents Resources...
-                    if (Path.GetExtension(gamePath)?.ToLowerInvariant() == ".app")
-                    {
-                        gamePath = Path.Combine(gamePath, "Contents", "Resources");
-                    }
-
-                    if (_filesToPatch is null)
-                        // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        FindPresentChapters(gamePath, "_mac");
-                
-                    foreach (var file in _filesToPatch) {
-                        var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
-                        if (_makeBackups) {
-                            MakeBackup(gamePath, dataWin);
-                        }
-                        await ApplyChapterPatch(gamePath, scriptsPath, file.Key, dataWin);
-                    }
 
                     break;
-                }
-                case DataWinMode.Console:
-                {
-                    _addBorders = false; // should already be present?
-                    // TODO: prompt the user to choose an nsz or somehow dump the game's RomFS here..?????
-
-                    if (_filesToPatch is null)
-                    {
-                        // try to look for all available chapter patterns for consoles
-                        _filesToPatch = [];
-                        if (File.Exists(Path.Join(gamePath, DataName)))
-                        {
-                            _filesToPatch.TryAdd("Menu", "");
-                        }
-
-                        // deltarune paths on consoles:
-                        var patterns = new Tuple<string, string>[] {
-                            Tuple.Create("chapter?_switch", "_switch"),
-                            Tuple.Create("chapter?_ps4", "_ps4"),
-                            Tuple.Create("chapter?_ps5", "_ps5") };
-                        foreach (var pattern in patterns)
-                        {
-                            foreach (var dir in Directory.GetDirectories(gamePath, pattern.Item1))
-                            {
-                                if (!File.Exists(Path.Join(dir, DataName)))
-                                {
-                                    continue;
-                                }
-                                var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-                                _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace(pattern.Item2, ""), dirName);
-                            }
-                        }
-                    }
-
-                    foreach (var file in _filesToPatch) {
-                        var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
-                        if (_makeBackups) {
-                            MakeBackup(gamePath, dataWin);
-                        }
-                        await ApplyChapterPatch(gamePath, scriptsPath, file.Key, dataWin);
-                    }
-
+                case Platforms.Switch:
+                case Platforms.Ps4:
+                case Platforms.Ps5:
+                case Platforms.Xbox:
                     // TODO: add logic to copy the LayeredFS mod???
                     break;
-                }
-                case DataWinMode.Windows:
-                default:
-                {
-                    if (_filesToPatch is null)
-                        // if it's null, that means the user didn't specify anything with --files, so patch every available file
-                        FindPresentChapters(gamePath);
-                
-                    foreach (var file in _filesToPatch) {
-                        var dataWin = file.Value == "" ? DataName : Path.Join(file.Value, DataName);
-                        if (_makeBackups) {
-                            MakeBackup(gamePath, dataWin);
-                        }
-                        await ApplyChapterPatch(gamePath, scriptsPath, file.Key, dataWin);
-                    }
-
-                    break;
-                }
             }
 
             ConsoleQuickEditSwitcher.SwitchQuickMode(true);
@@ -297,6 +355,9 @@ internal class Program
             WriteLine("-----------------------------------");
             WriteLine(LocalizedText.PatchSuccess1);
             WriteLine(LocalizedText.PatchSuccess2);
+
+            // not in finally to make troubleshooting easier
+            DeleteDirectoryNoReadOnly(ProgramTmpPath, true);
 
             Environment.Exit(0);
         }
@@ -351,19 +412,21 @@ internal class Program
         }
     }
 
-    private static void FindPresentChapters(string gamePath, string suffix = "_windows")
+    private static OrderedDictionary<string, string> FindPresentChapters(string gamePath)
     {
-        _filesToPatch = [];
-        if (File.Exists(Path.Join(gamePath, DataName)))
-            _filesToPatch.TryAdd("Menu", "");
+        var output = new OrderedDictionary<string, string>();
+        if (File.Exists(Path.Join(gamePath, SourcePlatform.DataName)))
+            output.TryAdd("Menu", "");
 
-        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?" + suffix))
+        foreach (var dir in Directory.GetDirectories(gamePath, "chapter?" + SourcePlatform.Suffix))
         {
-            if (!File.Exists(Path.Join(dir, DataName)))
+            if (!File.Exists(Path.Join(dir, SourcePlatform.DataName)))
                 continue;
-            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1];
-            _filesToPatch.TryAdd(dirName.Replace("chapter", "Chapter").Replace(suffix, ""), dirName);
+            var dirName = dir.Split(Path.DirectorySeparatorChar)[^1].Replace(SourcePlatform.Suffix, "");
+            output.TryAdd(dirName.Replace("chapter", "Chapter"), dirName);
         }
+
+        return output;
     }
     
     private static Stream GetEmbeddedFileStream(string resourceName) =>
@@ -508,7 +571,7 @@ internal class Program
                 return false;
             }
 
-            if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")) && _winMode == DataWinMode.Windows)
+            if (!File.Exists(Path.Combine(gamePath, "DELTARUNE.exe")) && SourcePlatform.DataName == "data.win")
             {
                 WriteLine(LocalizedText.ValidatePath6);
                 return false;
