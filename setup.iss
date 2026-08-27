@@ -18,7 +18,6 @@ WizardSmallImageFileDynamicDark=logo.bmp
 WizardImageFileDynamicDark=banner.bmp
 // SetupLogging=True
 ShowLanguageDialog=yes
-UsePreviousLanguage=no
 WizardSizePercent=130,130
 // this makes DefaultDirName and DisableDirPage not matter
 CreateAppDir=no
@@ -92,7 +91,7 @@ tr.AdvancedButtonText=Advanced
 tr.PlatformLabel1=Select the target platform:
 tr.PlatformWindows=Windows
 tr.PlatformAndroid=Android (DeltaQuick)
-tr.PlatformMac=Mac
+tr.PlatformMac=MacOS
 tr.PlatformLinux=Linux
 tr.PlatformSwitch=Nintendo Switch
 tr.PlatformPs4=PlayStation 4
@@ -114,7 +113,6 @@ const
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   DeltaruneExe = 'DELTARUNE.exe';
   DeltaruneSteamAppId = '1671210';
-  ShowPlatformSelect = False;
 type
 TPlatformInfo = record
   MessageKey: String;         // key in [CustomMessages] for the dropdown label
@@ -136,8 +134,9 @@ var
   PlatformCombo: TNewComboBox;
   Platforms: array of TPlatformInfo;
   SelectedPlatform: Integer;
-  // expand the array to support more chapters in the future
+  ShowPlatformSelect: Boolean;
   ExtraButton: TNewButton;
+  // expand the array to support more chapters in the future
   FilesToPatch: array[0..5] of Boolean;
   SkipLangFiles: Boolean;
   MakeBackups: Boolean;
@@ -163,6 +162,7 @@ end;
 // --- Available platforms ---
 // Comment out a line to remove that platform from the dropdown.
 // Order here is the order shown in the dropdown; first entry is the default.
+// If only one is uncommented the platform select will not appear
 procedure InitPlatforms;
 begin
   AddPlatform('PlatformWindows',        '',  True, False, False);
@@ -562,11 +562,12 @@ end;
 
 procedure UpdatePlatformControls;
 begin
-  BordersCheckbox.Visible := not Platforms[PlatformCombo.ItemIndex].ForceBorders;
+  BordersCheckbox.Visible := not Platforms[SelectedPlatform].ForceBorders;
 end;
 
 procedure PlatformComboChange(Sender: TObject);
 begin
+  SelectedPlatform := PlatformCombo.ItemIndex;
   UpdatePlatformControls;
 end;
 
@@ -575,6 +576,14 @@ var
   i: Integer;
 begin
   InitPlatforms;
+  if GetArrayLength(Platforms) < 1 then
+  begin
+    MsgBox('No platforms are enabled in setup.iss (InitPlatforms). At least one AddPlatform(...) line must be uncommented.', mbCriticalError, MB_OK);
+    Abort;
+  end;
+  ShowPlatformSelect := GetArrayLength(Platforms) <> 1;
+  SelectedPlatform := 0;
+  
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
   WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2');
 
@@ -601,7 +610,7 @@ begin
   ScriptsLinkLabel := CreateLinkLabel(InfoPage.Surface, ScriptsURL);
   ScriptsLinkLabel.Top := LangLinkLabel.Top + LangLinkLabel.Height + ScaleY(4);
   ScriptsLinkLabel.Left := InfoPage.MsgLabel.Left;
-  if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
+  if (ShowPlatformSelect) then
   begin
     PlatformLabel := TNewStaticText.Create(InfoPage);
     with PlatformLabel do
@@ -638,8 +647,22 @@ begin
       Caption := CustomMessage('BordersCheckbox');
       Checked := False;
     end;
-    UpdatePlatformControls;
+  end
+  else
+  begin
+    BordersCheckbox := TNewCheckBox.Create(InfoPage);
+    with BordersCheckbox do
+    begin
+      Parent := InfoPage.Surface;
+      Left := 0;
+      Top := ScriptsLinkLabel.Top + ScriptsLinkLabel.Height + ScaleY(12);
+      Width := InfoPage.SurfaceWidth;
+      Caption := CustomMessage('BordersCheckbox');
+      Checked := False;
+    end;
   end;
+
+  UpdatePlatformControls;
 
   ExtraButton := TNewButton.Create(WizardForm);
   ExtraButton.Parent := WizardForm;
@@ -667,9 +690,9 @@ begin
   GamePathPage.Buttons[OutputPathIndex].Visible := False;
   GamePathPage.PromptLabels[OutputPathIndex].Visible := False;
   
-  FinishedText := CustomMessage('FinishedText1') + #13#10 +
-                  + #13#10 +
-                  CustomMessage('FinishedText2');
+  FinishedText := CustomMessage('FinishedText1') + #13#10
+                  + #13#10
+                  + CustomMessage('FinishedText2');
 
   ProgressPage := CreateOutputProgressPage(CustomMessage('ProgressPage1a'), CustomMessage('ProgressPage1b'));
   
@@ -684,12 +707,6 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    SelectedPlatform := 0;
-    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
-    begin
-      SelectedPlatform := PlatformCombo.ItemIndex;
-    end;
-
     if Platforms[SelectedPlatform].RequiresGamePath then
     begin
       FoundGameLoc := FindGameLocation();
@@ -699,6 +716,7 @@ begin
         Exit;
       end;
       GamePathPage.Values[0] := FoundGameLoc;
+      GamePathPage.Values[OutputPathIndex] := FoundGameLoc;
     end;
   end
   else if CurPageID = GamePathPage.ID then
@@ -707,6 +725,7 @@ begin
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
+      Exit;
     end;
     if Platforms[SelectedPlatform].NeedsOutputPath and (Trim(GamePathPage.Values[OutputPathIndex]) = '') then
     begin
@@ -801,7 +820,7 @@ begin
   begin
     if MsgParts[1] = '1' then
     begin
-      ExceptionMsg := Format(CustomMessage('ExceptionMsg1a'), [ArchiveName]) + #1310 +
+      ExceptionMsg := Format(CustomMessage('ExceptionMsg1a'), [ArchiveName]) + #13#10 +
                       CustomMessage('ExceptionMsg1b') + DestDir;
       Handled := True;
     end
@@ -833,9 +852,9 @@ begin
         end;
         *)
         
-        ExceptionMsg := Format(CustomMessage('ExceptionMsg2a'), [ArchiveName]) + #13#10 +
-                        + #13#10 +
-                        CustomMessage('ExceptionMsg2b');
+        ExceptionMsg := Format(CustomMessage('ExceptionMsg2a'), [ArchiveName]) + #13#10
+                        + #13#10
+                        + CustomMessage('ExceptionMsg2b');
         Handled := True;
       end;
   end;
@@ -857,6 +876,23 @@ begin
   except
     HandleExtractionError(ExtractFileName(ArchiveFilePath), DestDir, GetExceptionMessage());
   end;
+end;
+
+function GetLangDestination: String;
+begin
+  if Platforms[SelectedPlatform].NeedsOutputPath then
+    Result := GamePathPage.Values[OutputPathIndex]
+  else
+    Result := GamePathPage.Values[0];
+
+  // fix Mac paths
+  if DirExists(AddBackslash(Result) + 'DELTARUNE.app') then
+    Result := AddBackslash(Result) + 'DELTARUNE.app';
+
+  if CompareText(ExtractFileExt(Result), '.app') = 0 then
+    Result := AddBackslash(AddBackslash(AddBackslash(Result) + 'Contents') + 'Resources')
+  else if FileExists(AddBackslash(AddBackslash(Result) + 'assets') + 'game.unx') then
+    Result := AddBackslash(Result) + 'assets';  // just an assumption based on the linux undertale build's structure
 end;
 
 function DownloadAndExtractFiles(): Boolean;
@@ -929,7 +965,7 @@ begin
     if (not SkipLangFiles) then
     begin
       ProgressPage.SetText(CustomMessage('ProgressPage3b'), '');
-      ExtractArchive(LangZipPath, GamePath);
+      ExtractArchive(LangZipPath, GetLangDestination);
     end;
 
     ProgressPage.SetText(CustomMessage('ProgressPage3c'), '');
@@ -948,22 +984,16 @@ begin
       ArgString := ArgString + ' ' + Platforms[SelectedPlatform].CliFlag;
     end;
 
-    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
+    if Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked then
     begin
-      if Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked then
-        ArgString := ArgString + ' --borders';
-    end
-    else
-    begin
-      if Platforms[SelectedPlatform].ForceBorders then
         ArgString := ArgString + ' --borders';
     end;
-
     if MakeBackups then
     begin
       ArgString := ArgString + ' --make-backups'
     end;
 
+    PatchAll := True;
     for i := 0 to Length(FilesToPatch) - 1 do begin
       if FilesToPatch[i] then
       begin
@@ -974,7 +1004,7 @@ begin
 
     if (not PatchAll) then
     begin
-      ArgString := ArgString + ' --files '
+      ArgString := ArgString + ' --files ';
       for i := 0 to Length(FilesToPatch) - 1 do begin
         if not FilesToPatch[i] then
         begin
@@ -1019,9 +1049,9 @@ begin
   if CurStep = ssPostInstall then
     if not DownloadAndExtractFiles() then
     begin
-      FinishedText := CustomMessage('FinishedText3a') + #13#10 +
-                      + #13#10 +
-                      CustomMessage('FinishedText3b');
+      FinishedText := CustomMessage('FinishedText3a') + #13#10
+                      + #13#10
+                      + CustomMessage('FinishedText3b');
     end;
 end;
 
@@ -1039,7 +1069,7 @@ begin
     GamePathPage.Buttons[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
     GamePathPage.PromptLabels[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
 
-    if Platforms[SelectedPlatform].NeedsOutputPath and (GamePathPage.Values[OutputPathIndex] = '') then
+    if GamePathPage.Values[OutputPathIndex] = '' then
       GamePathPage.Values[OutputPathIndex] := GamePathPage.Values[0];
   end;
 end;

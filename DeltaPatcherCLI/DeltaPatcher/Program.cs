@@ -259,6 +259,7 @@ internal class Program
 
                     // copy game folder to tmp
                     var tmpGameDir = Path.Join(ProgramTmpPath, "tmpGame");
+                    WriteLine(LocalizedText.CopyingFiles1);
                     CopyDirectory(gamePath, tmpGameDir);
 
                     gamePath = tmpGameDir;
@@ -315,9 +316,12 @@ internal class Program
                     Directory.CreateDirectory(outputDir);
                     var yml = ReadEmbeddedText("apktool.yml");
                     var xml = ReadEmbeddedText("AndroidManifest.xml");
+                    WriteLine("\n-----------------------------------");
+                    WriteLine(LocalizedText.PackagingPacks1);
                     foreach (var (chapter, value) in _filesToPatch)
                     {
                         var fileName = chapter == "Menu" ? "selector" : value + _targetPlatform.Suffix;
+                        WriteLine($"- {fileName}.pack");
                         
                         var chWorkDir = Path.Join(ProgramTmpPath, fileName);    // work dir for the current pack
                         var chAssetsDir = Path.Join(chWorkDir, "assets");       // assets dir in work dir
@@ -350,7 +354,7 @@ internal class Program
                                     ? xml.Replace("android:largeHeap=\"true\"", "")
                                     : xml);
                         RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, fileName)}.pack\"");
-                        
+                        WriteLine(LocalizedText.Done1);
                         DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }
 

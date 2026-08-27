@@ -36,7 +36,6 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER!
 
 - if you want the installer to support other platforms besides Windows, do these things as well:
     - For android (DeltaQuick) download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `setup.iss` and uncomment the line `Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall` in the \[Files\] section
-    - set `ShowPlatformSelect` from `False` to `True` in the beginning of the \[Code\] section
     - in `procedure InitPlatforms` uncomment the platforms you want to support
 
 - And finally, compile the installer in Inno Setup.
