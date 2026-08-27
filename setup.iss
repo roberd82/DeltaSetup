@@ -92,9 +92,15 @@ tr.AdvancedButtonText=Advanced
 tr.PlatformLabel1=Select the target platform:
 tr.PlatformWindows=Windows
 tr.PlatformAndroid=Android (DeltaQuick)
-tr.PlatformConsole=Console
 tr.PlatformMac=Mac
+tr.PlatformLinux=Linux
+tr.PlatformSwitch=Nintendo Switch
+tr.PlatformPs4=PlayStation 4
+tr.PlatformPs5=Playstation 5
+tr.PlatformXbox=Xbox
 tr.BordersCheckbox=Add console-exclusive borders
+tr.OutputPathPrompt=Output directory location:
+tr.OutputPathRequired=Please select an output location.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -115,6 +121,7 @@ TPlatformInfo = record
   CliFlag: String;            // extra argument for DeltaPatcherCLI.exe ('' = none)
   RequiresGamePath: Boolean;  // True if the installer should search for the game
   ForceBorders: Boolean;      // True to force the --borders argument, False to let the user chose (if the checkbox is visible)
+  NeedsOutputPath: Boolean;   // True if the user should have the option to select an output path
 end;
 var
   InfoPage: TOutputMsgWizardPage;
@@ -138,8 +145,9 @@ var
   LangLinkLabel: TNewStaticText;
   ScriptsLinkLabel: TNewStaticText;
   BordersCheckbox: TNewCheckBox;
+  OutputPathIndex: Integer;
 
-procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath, ForceBorders: Boolean);
+procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath, ForceBorders, NeedsOutputPath: Boolean);
 var
   Idx: Integer;
 begin
@@ -149,6 +157,7 @@ begin
   Platforms[Idx].CliFlag := CliFlag;
   Platforms[Idx].RequiresGamePath := RequiresGamePath;
   Platforms[Idx].ForceBorders := ForceBorders;
+  Platforms[Idx].NeedsOutputPath := NeedsOutputPath;
 end;
 
 // --- Available platforms ---
@@ -156,10 +165,14 @@ end;
 // Order here is the order shown in the dropdown; first entry is the default.
 procedure InitPlatforms;
 begin
-  AddPlatform('PlatformWindows',          '',  True, False);
-  AddPlatform('PlatformAndroid',   '--droid', False,  True);
-  //AddPlatform('PlatformConsole', '--console', False,  True);
-  //AddPlatform('PlatformMac'    ,     '--mac', False, False);
+  AddPlatform('PlatformWindows',        '',  True, False, False);
+  AddPlatform('PlatformAndroid', '--droid', False,  True,  True);
+  AddPlatform('PlatformMac',       '--mac', False, False, False);
+  //AddPlatform('PlatformLinux',   '--linux', False, False, False); // useless for now
+  //AddPlatform('PlatformSwitch', '--switch', False,  True, False);
+  //AddPlatform('PlatformPs4',       '--ps4', False,  True, False);
+  //AddPlatform('PlatformPs5',       '--ps5', False,  True, False);
+  //AddPlatform('PlatformXbox',     '--xbox', False,  True, False);
 end;
 
 procedure OpenLinkClick(Sender: TObject);
@@ -648,6 +661,11 @@ begin
   );
   GamePathPage.Add('');
   GamePathPage.Values[0] := ExpandConstant('{sd}\Program Files (x86)\Steam\steamapps\common\DELTARUNE');
+
+  OutputPathIndex := GamePathPage.Add(CustomMessage('OutputPathPrompt'));
+  GamePathPage.Edits[OutputPathIndex].Visible := False;
+  GamePathPage.Buttons[OutputPathIndex].Visible := False;
+  GamePathPage.PromptLabels[OutputPathIndex].Visible := False;
   
   FinishedText := CustomMessage('FinishedText1') + #13#10 +
                   + #13#10 +
@@ -689,6 +707,12 @@ begin
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
+    end;
+    if Platforms[SelectedPlatform].NeedsOutputPath and (Trim(GamePathPage.Values[OutputPathIndex]) = '') then
+    begin
+      MsgBox(CustomMessage('OutputPathRequired'), mbError, MB_OK);
+      Result := False;
+      Exit;
     end;
   end;
 end;
@@ -916,6 +940,9 @@ begin
 
     ArgString := '';
 
+    if Platforms[SelectedPlatform].NeedsOutputPath then
+      ArgString := ArgString + ' --output "' + GamePathPage.Values[OutputPathIndex] + '"';
+
     if Platforms[SelectedPlatform].CliFlag <> '' then
     begin
       ArgString := ArgString + ' ' + Platforms[SelectedPlatform].CliFlag;
@@ -1006,6 +1033,15 @@ begin
     WizardForm.FinishedLabel.Caption := FinishedText;
   end;
   ExtraButton.Visible := (CurPageID = GamePathPage.ID);
+  if CurPageID = GamePathPage.ID then
+  begin
+    GamePathPage.Edits[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
+    GamePathPage.Buttons[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
+    GamePathPage.PromptLabels[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
+
+    if Platforms[SelectedPlatform].NeedsOutputPath and (GamePathPage.Values[OutputPathIndex] = '') then
+      GamePathPage.Values[OutputPathIndex] := GamePathPage.Values[0];
+  end;
 end;
 
 procedure CloseInstaller;

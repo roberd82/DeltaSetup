@@ -122,7 +122,7 @@ internal class Program
     private static Platform SourcePlatform { get => field ?? _targetPlatform; set; }
     private static bool _makeBackups;
     private static bool _addBorders;
-    private static OrderedDictionary<string, string> _filesToPatch;      // key: chapter name, value: path to folder the data file is in relative to gamePath
+    private static OrderedDictionary<string, string> _filesToPatch;      // key: chapter name, value: path to folder the data file is in relative to gamePath (without the platform suffix)
 
     private static async Task Main(string[] args)
     {
@@ -157,7 +157,7 @@ internal class Program
                         scriptsPath = Path.Join(ProgramTmpPath, "scripts");
                         CopyDirectory(args[++i], scriptsPath);
                         break;
-                    case "--output" or "-o" when i + 1 < args.Length:
+                    case "--output" or "--out" or "-o" when i + 1 < args.Length:
                         outputPath = args[++i];
                         break;
                     case "--mac":
@@ -171,6 +171,8 @@ internal class Program
                         break;
                     case "--droid":
                     case "--android":
+                    case "--quick":
+                    case "--quicktale":
                     case "--deltaquick":
                         _targetPlatform = new Platform(Platforms.Droid);
                         break;
@@ -274,6 +276,17 @@ internal class Program
             }
 
             _filesToPatch ??= FindPresentChapters(gamePath);
+            
+            if (File.Exists(Path.Join(scriptsPath, "MoreSharedCodeChanges.txt")))
+            {
+                // append MoreSharedCodeChanges.txt to SharedCodeChanges if exists
+                var codePath = Path.Join(scriptsPath, "SharedCodeChanges.txt");
+                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, "MoreSharedCodeChanges.txt"));
+                var codeChanges = "";
+                if (File.Exists(codePath))
+                    codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
+                await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
+            }
 
             foreach (var (chapter, value) in _filesToPatch)
             {
