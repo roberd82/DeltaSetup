@@ -66,10 +66,12 @@ tr.RaiseException1=Archive file not found, path -
 tr.DownloadToTempWithMirror1=Downloading language files...
 tr.DownloadToTempWithMirror2=Downloading scripts...
 tr.DownloadToTempWithMirror3=An error occurred while downloading files: 
+tr.DownloadToTempWithMirror4=Downloading borders...
 tr.ProgressPage3a=Unpacking the patcher...
 tr.ProgressPage3b=Unpacking language files...
 tr.ProgressPage3c=Unpacking scripts...
 tr.ProgressPage3d=Applying the patch...
+tr.ProgressPage3e=Unpacking borders...
 tr.HandlePatcherError1=Error applying patch, error code: 
 tr.HandlePatcherError2=Failed to start patcher.
 tr.ExceptionMsg3=An error occurred during installation: 
@@ -79,6 +81,7 @@ tr.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translatio
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of the bundled version?
+tr.OfflineQuestion4=borders.7z file found next to installer. Use it instead of downloading it?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
 tr.PatchSelectPage1=Select Files to Patch
@@ -111,6 +114,8 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
+  BordersURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/borders.7z';
+  BordersURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/borders.7z';
   DeltaruneExe = 'DELTARUNE.exe';
   DeltaruneSteamAppId = '1671210';
 type
@@ -895,14 +900,20 @@ begin
     Result := AddBackslash(Result) + 'assets';  // just an assumption based on the linux undertale build's structure
 end;
 
+function NeedsBorders: Boolean;
+begin
+  Result := Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked;
+end;
+
 function DownloadAndExtractFiles(): Boolean;
 var
-  LangZipPath, ScriptsZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
+  LangZipPath, ScriptsZipPath, BordersZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
   ResultCode, i: Integer;
   PatchAll: Boolean;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
+  BordersZipPath := ExpandConstant('{tmp}\borders.7z');
   ApktoolPath := ExpandConstant('{tmp}\apktool.jar');
   PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
@@ -930,7 +941,7 @@ begin
 
     if FileExists(ExpandConstant('{src}\scripts.7z')) then
     begin
-     if MsgBox(CustomMessage('OfflineQuestion2'), mbConfirmation, MB_YESNO) = IDYES then
+    if MsgBox(CustomMessage('OfflineQuestion2'), mbConfirmation, MB_YESNO) = IDYES then
       begin
         CopyFile(ExpandConstant('{src}\scripts.7z'), ScriptsZipPath, False);
       end
@@ -942,6 +953,25 @@ begin
     else
     begin
       DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror2'), ScriptsURL, ScriptsURLMirror, 'scripts.7z');
+    end;
+
+    if NeedsBorders then
+    begin
+      if FileExists(ExpandConstant('{src}\borders.7z')) then
+      begin
+        if MsgBox(CustomMessage('OfflineQuestion4'), mbConfirmation, MB_YESNO) = IDYES then
+        begin
+          CopyFile(ExpandConstant('{src}\borders.7z'), BordersZipPath, False);
+        end
+        else
+        begin
+          DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror4'), BordersURL, BordersURLMirror, 'borders.7z');
+        end;
+      end
+      else
+      begin
+        DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror4'), BordersURL, BordersURLMirror, 'borders.7z');
+      end;
     end;
 
     if FileExists(ExpandConstant('{src}\apktool.jar')) then
@@ -970,6 +1000,12 @@ begin
 
     ProgressPage.SetText(CustomMessage('ProgressPage3c'), '');
     ExtractArchive(ScriptsZipPath, ExpandConstant('{tmp}\scripts'));
+
+    if NeedsBorders then
+    begin
+      ProgressPage.SetText(CustomMessage('ProgressPage3e'), '');
+      ExtractArchive(BordersZipPath, ExpandConstant('{tmp}\scripts'));
+    end;
     
     ProgressPage.SetText(CustomMessage('ProgressPage3d'), '');
     PatcherPath := ExpandConstant('{tmp}\DeltaPatcherCLI.exe');
@@ -984,7 +1020,7 @@ begin
       ArgString := ArgString + ' ' + Platforms[SelectedPlatform].CliFlag;
     end;
 
-    if Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked then
+    if NeedsBorders then
     begin
         ArgString := ArgString + ' --borders';
     end;

@@ -130,6 +130,7 @@ internal class Program
         var gamePath = "";
         var scriptsPath = "";
         string outputPath = null;
+        List<string> overridePaths = null;
 
         try
         {
@@ -154,8 +155,7 @@ internal class Program
                             gamePath = Path.Join(gamePath, "assets");
                         break;
                     case "--scripts" when i + 1 < args.Length:
-                        scriptsPath = Path.Join(ProgramTmpPath, "scripts");
-                        CopyDirectory(args[++i], scriptsPath);
+                        scriptsPath = args[++i];
                         break;
                     case "--output" or "--out" or "-o" when i + 1 < args.Length:
                         outputPath = args[++i];
@@ -194,6 +194,13 @@ internal class Program
                         break;
                     case "--borders":
                         _addBorders = true;
+                        // needs to be next to scripts folder
+                        if (i + 1 < args.Length)
+                            CopyDirectory(args[++i], Path.Join(ProgramTmpPath, "borders"));
+                        break;
+                    case "--override" when i + 1 < args.Length:
+                        overridePaths ??= [];
+                        overridePaths.Add(args[++i]);
                         break;
                     case "--files" when i + 1 < args.Length:
                         _filesToPatch = [];
@@ -249,6 +256,25 @@ internal class Program
 
             if (_targetPlatform.AddBorders.HasValue)
                 _addBorders = _targetPlatform.AddBorders.Value;
+            
+            if (_addBorders && !Directory.Exists(Path.Join(ProgramTmpPath, "borders")))
+            {
+                if (Directory.Exists(Path.Join(scriptsPath, "..", "borders")))
+                    CopyDirectory(Path.Join(scriptsPath, "..", "borders"), Path.Join(ProgramTmpPath, "borders"));
+                else
+                    throw new DirectoryNotFoundException(LocalizedText.BordersError1);
+            }
+            
+            CopyDirectory(scriptsPath, Path.Join(ProgramTmpPath, "scripts"));
+            scriptsPath = Path.Join(ProgramTmpPath, "scripts");
+            
+            if (overridePaths is not null)
+            {
+                foreach (var overridePath in overridePaths) 
+                {
+                    CopyDirectory(overridePath, scriptsPath);
+                }
+            }
 
             // preparations
             switch (_targetPlatform.Type)
@@ -263,10 +289,6 @@ internal class Program
                     CopyDirectory(gamePath, tmpGameDir);
 
                     gamePath = tmpGameDir;
-
-                    // copy modifications needed for android and overwrite the default files
-                    if (Directory.Exists(Path.Join(scriptsPath, "android")))
-                        CopyDirectory(Path.Join(scriptsPath, "android"), scriptsPath);
                     break;
                 case Platforms.Switch:
                 case Platforms.Ps4:

@@ -42,5 +42,6 @@
         public const string CopyingFiles1       = "Copying game files...";
         public const string PackagingPacks1     = "Making packs:";
         public const string Done1               = "Done!";
+        public const string BordersError1       = "The borders directory was not found!";
     }
 }
