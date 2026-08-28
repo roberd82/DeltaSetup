@@ -195,7 +195,7 @@ internal class Program
                     case "--borders":
                         _addBorders = true;
                         // needs to be next to scripts folder
-                        if (i + 1 < args.Length)
+                        if (i + 1 < args.Length && Directory.Exists(args[i + 1]))
                             CopyDirectory(args[++i], Path.Join(ProgramTmpPath, "borders"));
                         break;
                     case "--override" when i + 1 < args.Length:
