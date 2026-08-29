@@ -401,7 +401,7 @@ internal class Program
                             chapter == "Menu" && _filesToPatch.Count > 1
                                     ? xml.Replace("android:largeHeap=\"true\"", "")
                                     : xml);
-                        RunCommand("java", $"-jar {apktoolPath} b \"{chWorkDir}\" -o \"{Path.Join(outputDir, fileName)}.pack\"");
+                        RunCommand("java", $"-jar \"{apktoolPath}\" b \"{chWorkDir}\" -o \"{Path.Join(outputDir, fileName)}.pack\"");
                         WriteLine(LocalizedText.Done1);
                         DeleteDirectoryNoReadOnly(chWorkDir, true);
                     }

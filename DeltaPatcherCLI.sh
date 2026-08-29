@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# ==================================================================================================
-# ========================== DeltaPatcherCLI launcher for macOS and Linux ==========================
-# ==================================================================================================
+# ==============================================================================================
+# ======================== DeltaPatcherCLI launcher for macOS and Linux ========================
+# ==============================================================================================
 #
-# ============================================= USAGE ==============================================
+# =========================================== USAGE ============================================
 #
 # 1. Get the following files:
 #    - the lang files for the translation you want to install
@@ -13,11 +13,13 @@
 #    - from here: https://github.com/roberd82/DeltranslatePatch-Optional/releases/tag/latest
 #      - quicktale.7z (OPTIONAL, only if you want to make DeltaQuick packs for Android)
 #    - from here: https://github.com/iBotPeaches/Apktool/releases/latest
-#      - the latest apktool.jar (OPTIONAL, only if you want to make DeltaQuick packs for Android)
+#      - the latest apktool.jar (OPTIONAL, only if you want to make DeltaQuick packs
+#        for Android. Also you need to have Java JRE installed:
+#        https://adoptium.net/temurin/releases)
 #
 # 2. In Steam right-click DELTARUNE -> Manage -> Browse local files, then put this file,
-#    the executable, and the extracted folders next to the __MACOSX and DELTARUNE.app folders, so
-#    that the game folder looks like this:
+#    the executable, and the extracted folders next to the __MACOSX and DELTARUNE.app folders,
+#    so that the game folder looks like this:
 #    - __MACOSX
 #    - DELTARUNE.app
 #    - DeltaPatcherCLI.sh
@@ -30,11 +32,14 @@
 # 3. Edit the CONFIGURATION section below, each setting has a description on what it does.
 #    (The settings are set to the macOS defaults by default.)
 #
-# 4. Make sure this file (DeltaPatcherCLI.sh) is executable:
-#    - (in terminal) chmod +x DeltaPatcherCLI.sh
+# 4. Open the terminal in the game folder:
+#    - have Terminal in your Dock
+#    - Press the ⌘ + Up arrow to move up a directory
+#    - drag the DELTARUNE folder on the Terminal icon in the Dock
 #
-# 5. Run the script:
-#    - (in terminal) ./DeltaPatcherCLI.sh
+# 5. Run these commands:
+#    - chmod +x DeltaPatcherCLI.sh
+#    - ./DeltaPatcherCLI.sh
 
 
 set -euo pipefail
@@ -44,7 +49,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXE_PATH="${SCRIPT_DIR}/${EXE_NAME}"
 
 
-# ========================================= CONFIGURATION ==========================================
+# ======================================= CONFIGURATION ========================================
 
 # Path to the DELTARUNE game installation (required).
 GAME_PATH="${SCRIPT_DIR}/DELTARUNE.app"
@@ -69,7 +74,7 @@ MAKE_BACKUPS=false
 # FILES_TO_SKIP=(0 2) skips the menu (0) and Chapter 2, leave blank to patch every chapter
 FILES_TO_SKIP=()
 
-# ======================================= CONFIGURATION END ========================================
+# ===================================== CONFIGURATION END ======================================
 
 # Path to the extracted scripts folder (required).
 SCRIPTS_PATH="${SCRIPT_DIR}/scripts"
@@ -84,10 +89,30 @@ if [[ ! -x "${EXE_PATH}" ]]; then
     chmod +x "${EXE_PATH}"
 fi
 
+fix_mac_linux_path() {
+    local path="$1"
+
+    if [[ -d "${path}/DELTARUNE.app" ]]; then
+        path="${path}/DELTARUNE.app"
+    fi
+
+    local path_lower
+    path_lower="$(printf '%s' "${path}" | tr '[:upper:]' '[:lower:]')"
+    if [[ "${path_lower}" == *.app ]]; then
+        path="${path}/Contents/Resources"
+    elif [[ -f "${path}/assets/game.unx" ]]; then
+        path="${path}/assets"
+    fi
+
+    printf '%s' "${path}"
+}
+
 if [[ -z "${GAME_PATH}" ]]; then
     echo "Error: GAME_PATH is empty. Edit this script and set GAME_PATH before running." >&2
     exit 1
 fi
+
+GAME_PATH="$(fix_mac_linux_path "${GAME_PATH}")"
 
 if [[ -z "${SCRIPTS_PATH}" ]]; then
     echo "Error: SCRIPTS_PATH is empty. Edit this script and set SCRIPTS_PATH before running." >&2
