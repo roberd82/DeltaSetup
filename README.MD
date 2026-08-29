@@ -36,16 +36,24 @@ IMPORTANT! THE EXECUTABLE FILE IN THE ARCHIVE MUST NOT BE IN A SUBFOLDER!
 
 - if you want the installer to support other platforms besides Windows, do these things as well:
     - For android (DeltaQuick) download the latest release of [apktool](https://github.com/iBotPeaches/Apktool/releases/latest), rename the .jar to `apktool.jar` (remove the version number), and put it next to `setup.iss` and uncomment the line `Source: "apktool.jar"; DestDir: "{tmp}"; Flags: deleteafterinstall` in the \[Files\] section
-    - set `ShowPlatformSelect` from `False` to `True` in the beginning of the \[Code\] section
     - in `procedure InitPlatforms` uncomment the platforms you want to support
 
 - And finally, compile the installer in Inno Setup.
 
 - Done, you've built your DELTARUNE translation installer!
 
+## Mac and Linux users
+For Linux users the best approach is put the same Windows Inno Setup `.exe` into the game directory, rename `DELTARUNE.exe` to something different, rename the installer to `DELTARUNE.exe`, start the game from Steam (with Proton), go through the setup, then name back `DELTARUNE.exe`, but the following method also works for it.
+
+- compile the patcher with these commands:
+    - `dotnet publish -f net10.0 -m:1 -r osx-x64` for older Intel Macs
+    - `dotnet publish -f net10.0 -m:1 -r osx-arm64` for newer ARM Macs
+    - `dotnet publish -f net10.0 -m:1 -r linux-x64` for Linux
+- translate the instructions in `DeltaPatcherCLI.sh` and bundle it together with the executables
+
 # Installing without Internet connection
 
-If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection. (You can also override the bundled (or missing) `apktool.jar` the same way.)
+If you rename your translation archive to `lang.7z`, download the `scripts.7z` and put it next the installer file, it can recognize them and ask during the install process if you want to use them instead of downloading them. This way it is possible to install a translation without having an Internet connection. (You can also override the bundled (or missing) `apktool.jar` and `borders.7z` the same way.)
 
 # Installing to DeltaQuick
 

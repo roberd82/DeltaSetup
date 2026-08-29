@@ -18,7 +18,6 @@ WizardSmallImageFileDynamicDark=logo.bmp
 WizardImageFileDynamicDark=banner.bmp
 // SetupLogging=True
 ShowLanguageDialog=yes
-UsePreviousLanguage=no
 WizardSizePercent=130,130
 // this makes DefaultDirName and DisableDirPage not matter
 CreateAppDir=no
@@ -67,10 +66,15 @@ tr.RaiseException1=Archive file not found, path -
 tr.DownloadToTempWithMirror1=Downloading language files...
 tr.DownloadToTempWithMirror2=Downloading scripts...
 tr.DownloadToTempWithMirror3=An error occurred while downloading files: 
+tr.DownloadToTempWithMirror4=Downloading borders...
+tr.DownloadToTempWithMirror5=Failed to download from both the main URL and the mirror:
 tr.ProgressPage3a=Unpacking the patcher...
 tr.ProgressPage3b=Unpacking language files...
 tr.ProgressPage3c=Unpacking scripts...
 tr.ProgressPage3d=Applying the patch...
+tr.ProgressPage3e=Unpacking borders...
+tr.ProgressPage3f=Downloading override
+tr.ProgressPage3g=Unpacking override
 tr.HandlePatcherError1=Error applying patch, error code: 
 tr.HandlePatcherError2=Failed to start patcher.
 tr.ExceptionMsg3=An error occurred during installation: 
@@ -80,6 +84,8 @@ tr.FinishedHeadingLabel1=Completing the installation of the DELTARUNE Translatio
 tr.OfflineQuestion1=lang.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion2=scripts.7z file found next to installer. Use it instead of downloading it?
 tr.OfflineQuestion3=apktool.jar file found next to installer. Use it instead of the bundled version?
+tr.OfflineQuestion4=borders.7z file found next to installer. Use it instead of downloading it?
+tr.OfflineQuestionOverride=Override file(s) found next to installer. Use them instead of downloading?
 tr.wpWelcome12=If you have the translation and script files you can install them without connecting to the Internet. Just rename the translation archive to "lang.7z" and place it and the "scripts.7z" file next to the installer file.
 tr.wpWelcome13=You can download them from here:
 tr.PatchSelectPage1=Select Files to Patch
@@ -92,9 +98,15 @@ tr.AdvancedButtonText=Advanced
 tr.PlatformLabel1=Select the target platform:
 tr.PlatformWindows=Windows
 tr.PlatformAndroid=Android (DeltaQuick)
-tr.PlatformConsole=Console
-tr.PlatformMac=Mac
+tr.PlatformMac=MacOS
+tr.PlatformLinux=Linux
+tr.PlatformSwitch=Nintendo Switch
+tr.PlatformPs4=PlayStation 4
+tr.PlatformPs5=Playstation 5
+tr.PlatformXbox=Xbox
 tr.BordersCheckbox=Add console-exclusive borders
+tr.OutputPathPrompt=Output directory location:
+tr.OutputPathRequired=Please select an output location.
 
 [Files]
 Source: "DeltaPatcherCLI.7z"; DestDir: "{tmp}"; Flags: deleteafterinstall
@@ -106,15 +118,18 @@ const
   LangURLMirror = 'https://github.com/Lazy-Desman/EngDeltranslatePack/releases/download/latest/lang.7z';
   ScriptsURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
   ScriptsURLMirror = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/scripts.7z';
+  BordersURL = 'https://github.com/Lazy-Desman/DeltranslatePatch/releases/download/latest/borders.7z';
+  BordersURLMirror = 'https://github.com/roberd82/DeltranslatePatch/releases/download/latest/borders.7z';
   DeltaruneExe = 'DELTARUNE.exe';
   DeltaruneSteamAppId = '1671210';
-  ShowPlatformSelect = False;
 type
 TPlatformInfo = record
-  MessageKey: String;         // key in [CustomMessages] for the dropdown label
-  CliFlag: String;            // extra argument for DeltaPatcherCLI.exe ('' = none)
-  RequiresGamePath: Boolean;  // True if the installer should search for the game
-  ForceBorders: Boolean;      // True to force the --borders argument, False to let the user chose (if the checkbox is visible)
+  MessageKey: String;           // key in [CustomMessages] for the dropdown label
+  CliFlag: String;              // extra argument for DeltaPatcherCLI.exe ('' = none)
+  RequiresGamePath: Boolean;    // True if the installer should search for the game
+  ForceBorders: Boolean;        // True to force the --borders argument, False to let the user chose with the checkbox
+  NeedsOutputPath: Boolean;     // True if the user should have the option to select an output path
+  OverrideUrls: array of String;// list of urls to .7z files who's contents will be copied into the scripts folder
 end;
 var
   InfoPage: TOutputMsgWizardPage;
@@ -129,8 +144,9 @@ var
   PlatformCombo: TNewComboBox;
   Platforms: array of TPlatformInfo;
   SelectedPlatform: Integer;
-  // expand the array to support more chapters in the future
+  ShowPlatformSelect: Boolean;
   ExtraButton: TNewButton;
+  // expand the array to support more chapters in the future
   FilesToPatch: array[0..5] of Boolean;
   SkipLangFiles: Boolean;
   MakeBackups: Boolean;
@@ -138,10 +154,11 @@ var
   LangLinkLabel: TNewStaticText;
   ScriptsLinkLabel: TNewStaticText;
   BordersCheckbox: TNewCheckBox;
+  OutputPathIndex: Integer;
 
-procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath, ForceBorders: Boolean);
+procedure AddPlatform(const MessageKey, CliFlag: String; RequiresGamePath, ForceBorders, NeedsOutputPath: Boolean; OverrideUrls: array of String);
 var
-  Idx: Integer;
+  Idx, i: Integer;
 begin
   Idx := GetArrayLength(Platforms);
   SetArrayLength(Platforms, Idx + 1);
@@ -149,17 +166,27 @@ begin
   Platforms[Idx].CliFlag := CliFlag;
   Platforms[Idx].RequiresGamePath := RequiresGamePath;
   Platforms[Idx].ForceBorders := ForceBorders;
+  Platforms[Idx].NeedsOutputPath := NeedsOutputPath;
+
+  SetArrayLength(Platforms[Idx].OverrideUrls, GetArrayLength(OverrideUrls));
+  for i := 0 to GetArrayLength(OverrideUrls) - 1 do
+    Platforms[Idx].OverrideUrls[i] := OverrideUrls[i];
 end;
 
 // --- Available platforms ---
 // Comment out a line to remove that platform from the dropdown.
 // Order here is the order shown in the dropdown; first entry is the default.
+// If only one is uncommented the platform select will not appear
 procedure InitPlatforms;
 begin
-  AddPlatform('PlatformWindows',          '',  True, False);
-  AddPlatform('PlatformAndroid',   '--droid', False,  True);
-  //AddPlatform('PlatformConsole', '--console', False,  True);
-  //AddPlatform('PlatformMac'    ,     '--mac', False, False);
+  AddPlatform('PlatformWindows',        '',  True, False, False, []);
+  AddPlatform('PlatformAndroid', '--droid', False,  True,  True, ['https://github.com/roberd82/DeltranslatePatch-Optional/releases/download/latest/quicktale.7z']);
+  AddPlatform('PlatformMac',       '--mac', False, False, False, []);
+  //AddPlatform('PlatformLinux',   '--linux', False, False, False, []); // useless for now
+  //AddPlatform('PlatformSwitch', '--switch', False,  True, False, []);
+  //AddPlatform('PlatformPs4',       '--ps4', False,  True, False, []);
+  //AddPlatform('PlatformPs5',       '--ps5', False,  True, False, []);
+  //AddPlatform('PlatformXbox',     '--xbox', False,  True, False, []);
 end;
 
 procedure OpenLinkClick(Sender: TObject);
@@ -549,12 +576,19 @@ end;
 
 procedure UpdatePlatformControls;
 begin
-  BordersCheckbox.Visible := not Platforms[PlatformCombo.ItemIndex].ForceBorders;
+  BordersCheckbox.Visible := not Platforms[SelectedPlatform].ForceBorders;
 end;
 
 procedure PlatformComboChange(Sender: TObject);
 begin
+  SelectedPlatform := PlatformCombo.ItemIndex;
   UpdatePlatformControls;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  DelTree(ExpandConstant('{tmp}\DeltaSetup'), True, True, True);
+  Result := True;
 end;
 
 procedure InitializeWizard;
@@ -562,6 +596,14 @@ var
   i: Integer;
 begin
   InitPlatforms;
+  if GetArrayLength(Platforms) < 1 then
+  begin
+    MsgBox('No platforms are enabled in setup.iss (InitPlatforms). At least one AddPlatform(...) line must be uncommented.', mbCriticalError, MB_OK);
+    Abort;
+  end;
+  ShowPlatformSelect := GetArrayLength(Platforms) <> 1;
+  SelectedPlatform := 0;
+  
   WizardForm.WelcomeLabel1.Caption := CustomMessage('WelcomeLabel1');
   WizardForm.WelcomeLabel2.Caption := CustomMessage('WelcomeLabel2');
 
@@ -588,7 +630,7 @@ begin
   ScriptsLinkLabel := CreateLinkLabel(InfoPage.Surface, ScriptsURL);
   ScriptsLinkLabel.Top := LangLinkLabel.Top + LangLinkLabel.Height + ScaleY(4);
   ScriptsLinkLabel.Left := InfoPage.MsgLabel.Left;
-  if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
+  if (ShowPlatformSelect) then
   begin
     PlatformLabel := TNewStaticText.Create(InfoPage);
     with PlatformLabel do
@@ -625,8 +667,22 @@ begin
       Caption := CustomMessage('BordersCheckbox');
       Checked := False;
     end;
-    UpdatePlatformControls;
+  end
+  else
+  begin
+    BordersCheckbox := TNewCheckBox.Create(InfoPage);
+    with BordersCheckbox do
+    begin
+      Parent := InfoPage.Surface;
+      Left := 0;
+      Top := ScriptsLinkLabel.Top + ScriptsLinkLabel.Height + ScaleY(12);
+      Width := InfoPage.SurfaceWidth;
+      Caption := CustomMessage('BordersCheckbox');
+      Checked := False;
+    end;
   end;
+
+  UpdatePlatformControls;
 
   ExtraButton := TNewButton.Create(WizardForm);
   ExtraButton.Parent := WizardForm;
@@ -648,10 +704,15 @@ begin
   );
   GamePathPage.Add('');
   GamePathPage.Values[0] := ExpandConstant('{sd}\Program Files (x86)\Steam\steamapps\common\DELTARUNE');
+
+  OutputPathIndex := GamePathPage.Add(CustomMessage('OutputPathPrompt'));
+  GamePathPage.Edits[OutputPathIndex].Visible := False;
+  GamePathPage.Buttons[OutputPathIndex].Visible := False;
+  GamePathPage.PromptLabels[OutputPathIndex].Visible := False;
   
-  FinishedText := CustomMessage('FinishedText1') + #13#10 +
-                  + #13#10 +
-                  CustomMessage('FinishedText2');
+  FinishedText := CustomMessage('FinishedText1') + #13#10
+                  + #13#10
+                  + CustomMessage('FinishedText2');
 
   ProgressPage := CreateOutputProgressPage(CustomMessage('ProgressPage1a'), CustomMessage('ProgressPage1b'));
   
@@ -666,12 +727,6 @@ begin
   
   if CurPageID = InfoPage.ID then
   begin
-    SelectedPlatform := 0;
-    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
-    begin
-      SelectedPlatform := PlatformCombo.ItemIndex;
-    end;
-
     if Platforms[SelectedPlatform].RequiresGamePath then
     begin
       FoundGameLoc := FindGameLocation();
@@ -681,6 +736,7 @@ begin
         Exit;
       end;
       GamePathPage.Values[0] := FoundGameLoc;
+      GamePathPage.Values[OutputPathIndex] := FoundGameLoc;
     end;
   end
   else if CurPageID = GamePathPage.ID then
@@ -689,6 +745,13 @@ begin
     begin
       MsgBox(CustomMessage('FoundGameLoc2'), mbError, MB_OK);
       Result := False;
+      Exit;
+    end;
+    if Platforms[SelectedPlatform].NeedsOutputPath and (Trim(GamePathPage.Values[OutputPathIndex]) = '') then
+    begin
+      MsgBox(CustomMessage('OutputPathRequired'), mbError, MB_OK);
+      Result := False;
+      Exit;
     end;
   end;
 end;
@@ -699,6 +762,26 @@ begin
   Result := True;
 end;
 
+function TryGetFileSize(const URL: String): Integer;
+begin
+  try
+    Result := DownloadTemporaryFileSize(URL);
+  except
+    Result := -1;
+  end;
+end;
+
+function TryDownloadFile(const URL, FileName: String; DownloadCallback: TOnDownloadProgress): Boolean;
+begin
+  Result := False;
+  try
+    DownloadTemporaryFile(URL, FileName, '', DownloadCallback);
+    Result := FileExists(ExpandConstant('{tmp}\' + FileName));
+  except
+    Result := False;
+  end;
+end;
+
 procedure DownloadToTempWithMirror(const TextHeader, MainURL, MirrorURL, FileName: String);
 var
   FileSizeBytes: Integer;
@@ -707,11 +790,9 @@ var
 begin
   ProgressPage.SetText(TextHeader, '');
   
-  try
-    FileSizeBytes := DownloadTemporaryFileSize(MainURL);
-  except
-    FileSizeBytes := DownloadTemporaryFileSize(MirrorURL);
-  end;
+  FileSizeBytes := TryGetFileSize(MainURL);
+  if FileSizeBytes <= 0 then
+    FileSizeBytes := TryGetFileSize(MirrorURL);
   
   if FileSizeBytes > 0 then
   begin
@@ -722,10 +803,10 @@ begin
   else
     DownloadCallback := nil;
   
-  try
-    DownloadTemporaryFile(MainURL, FileName, '', DownloadCallback);
-  except
-    DownloadTemporaryFile(MirrorURL, FileName, '', DownloadCallback);
+  if not TryDownloadFile(MainURL, FileName, DownloadCallback) then
+  begin
+    if not TryDownloadFile(MirrorURL, FileName, DownloadCallback) then
+      RaiseException(CustomMessage('DownloadToTempWithMirror5') + ' ' + FileName);
   end;
 end;
 
@@ -777,7 +858,7 @@ begin
   begin
     if MsgParts[1] = '1' then
     begin
-      ExceptionMsg := Format(CustomMessage('ExceptionMsg1a'), [ArchiveName]) + #1310 +
+      ExceptionMsg := Format(CustomMessage('ExceptionMsg1a'), [ArchiveName]) + #13#10 +
                       CustomMessage('ExceptionMsg1b') + DestDir;
       Handled := True;
     end
@@ -809,9 +890,9 @@ begin
         end;
         *)
         
-        ExceptionMsg := Format(CustomMessage('ExceptionMsg2a'), [ArchiveName]) + #13#10 +
-                        + #13#10 +
-                        CustomMessage('ExceptionMsg2b');
+        ExceptionMsg := Format(CustomMessage('ExceptionMsg2a'), [ArchiveName]) + #13#10
+                        + #13#10
+                        + CustomMessage('ExceptionMsg2b');
         Handled := True;
       end;
   end;
@@ -835,14 +916,84 @@ begin
   end;
 end;
 
+function GetLangDestination: String;
+begin
+  if Platforms[SelectedPlatform].NeedsOutputPath then
+    Result := GamePathPage.Values[OutputPathIndex]
+  else
+    Result := GamePathPage.Values[0];
+
+  // fix Mac paths
+  if DirExists(AddBackslash(Result) + 'DELTARUNE.app') then
+    Result := AddBackslash(Result) + 'DELTARUNE.app';
+
+  if CompareText(ExtractFileExt(Result), '.app') = 0 then
+    Result := AddBackslash(AddBackslash(AddBackslash(Result) + 'Contents') + 'Resources')
+  else if FileExists(AddBackslash(AddBackslash(Result) + 'assets') + 'game.unx') then
+    Result := AddBackslash(Result) + 'assets';  // just an assumption based on the linux undertale build's structure
+end;
+
+function NeedsBorders: Boolean;
+begin
+  Result := Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked;
+end;
+
+function CollectOfflineOverrides(var FileNames: TArrayOfString): Boolean;
+var
+  FindRec: TFindRec;
+  SrcDir: String;
+begin
+  SetArrayLength(FileNames, 0);
+  SrcDir := ExpandConstant('{src}');
+
+  if FindFirst(AddBackslash(SrcDir) + 'override_*.7z', FindRec) then
+  begin
+    try
+      repeat
+        SetArrayLength(FileNames, GetArrayLength(FileNames) + 1);
+        FileNames[GetArrayLength(FileNames) - 1] := FindRec.Name;
+      until not FindNext(FindRec);
+    finally
+      FindClose(FindRec);
+    end;
+  end;
+
+  // check for a single unnumbered override.7z
+  if (GetArrayLength(FileNames) = 0) and FileExists(AddBackslash(SrcDir) + 'override.7z') then
+  begin
+    SetArrayLength(FileNames, 1);
+    FileNames[0] := 'override.7z';
+  end;
+
+  Result := GetArrayLength(FileNames) > 0;
+end;
+
+function GetOverrideIndexFromFileName(const FileName: String): Integer;
+var
+  NumStr: String;
+begin
+  if CompareText(FileName, 'override.7z') = 0 then
+  begin
+    Result := 0;
+    Exit;
+  end;
+
+  NumStr := FileName;
+  StringChangeEx(NumStr, 'override_', '', True);
+  StringChangeEx(NumStr, '.7z', '', True);
+  Result := StrToIntDef(NumStr, -1);
+end;
+
 function DownloadAndExtractFiles(): Boolean;
 var
-  LangZipPath, ScriptsZipPath, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
-  ResultCode, i: Integer;
+  LangZipPath, ScriptsZipPath, BordersZipPath, OverrideZipPath, OverrideDestDir, ApktoolPath, PatcherZipPath, GamePath, PatcherPath, ExceptionMsg, ArgString: String;
+  ResultCode, i, OverrideIdx: Integer;
+  OfflineOverrides: TArrayOfString;
   PatchAll: Boolean;
 begin
   LangZipPath := ExpandConstant('{tmp}\lang.7z');
   ScriptsZipPath := ExpandConstant('{tmp}\scripts.7z');
+  BordersZipPath := ExpandConstant('{tmp}\borders.7z');
   ApktoolPath := ExpandConstant('{tmp}\apktool.jar');
   PatcherZipPath := ExpandConstant('{tmp}\DeltaPatcherCLI.7z');
   GamePath := GamePathPage.Values[0];
@@ -870,7 +1021,7 @@ begin
 
     if FileExists(ExpandConstant('{src}\scripts.7z')) then
     begin
-     if MsgBox(CustomMessage('OfflineQuestion2'), mbConfirmation, MB_YESNO) = IDYES then
+    if MsgBox(CustomMessage('OfflineQuestion2'), mbConfirmation, MB_YESNO) = IDYES then
       begin
         CopyFile(ExpandConstant('{src}\scripts.7z'), ScriptsZipPath, False);
       end
@@ -884,6 +1035,25 @@ begin
       DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror2'), ScriptsURL, ScriptsURLMirror, 'scripts.7z');
     end;
 
+    if NeedsBorders then
+    begin
+      if FileExists(ExpandConstant('{src}\borders.7z')) then
+      begin
+        if MsgBox(CustomMessage('OfflineQuestion4'), mbConfirmation, MB_YESNO) = IDYES then
+        begin
+          CopyFile(ExpandConstant('{src}\borders.7z'), BordersZipPath, False);
+        end
+        else
+        begin
+          DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror4'), BordersURL, BordersURLMirror, 'borders.7z');
+        end;
+      end
+      else
+      begin
+        DownloadToTempWithMirror(CustomMessage('DownloadToTempWithMirror4'), BordersURL, BordersURLMirror, 'borders.7z');
+      end;
+    end;
+
     if FileExists(ExpandConstant('{src}\apktool.jar')) then
     begin
       if MsgBox(CustomMessage('OfflineQuestion3'), mbConfirmation, MB_YESNO) = IDYES then
@@ -891,6 +1061,43 @@ begin
         CopyFile(ExpandConstant('{src}\apktool.jar'), ApktoolPath, False);
       end;
     end;
+
+  if CollectOfflineOverrides(OfflineOverrides) then
+  begin
+    // offline overrides present, use these instead of the platform-defined URLs
+    if MsgBox(CustomMessage('OfflineQuestionOverride'), mbConfirmation, MB_YESNO) = IDYES then
+    begin
+      for i := 0 to GetArrayLength(OfflineOverrides) - 1 do
+      begin
+        OverrideIdx := GetOverrideIndexFromFileName(OfflineOverrides[i]);
+        if OverrideIdx >= 0 then
+          CopyFile(ExpandConstant('{src}\' + OfflineOverrides[i]),
+                    ExpandConstant('{tmp}\override_' + IntToStr(OverrideIdx) + '.7z'), False);
+      end;
+    end
+    else
+    begin
+      // user declined offline files
+      for i := 0 to GetArrayLength(Platforms[SelectedPlatform].OverrideUrls) - 1 do
+        DownloadToTempWithMirror(
+          CustomMessage('ProgressPage3f') + ' ' + IntToStr(i + 1) + '/' + IntToStr(GetArrayLength(Platforms[SelectedPlatform].OverrideUrls)),
+          Platforms[SelectedPlatform].OverrideUrls[i],
+          Platforms[SelectedPlatform].OverrideUrls[i],
+          'override_' + IntToStr(i) + '.7z'
+        );
+    end;
+  end
+  else
+  begin
+    // nothing offline, download every platform-defined override
+    for i := 0 to GetArrayLength(Platforms[SelectedPlatform].OverrideUrls) - 1 do
+      DownloadToTempWithMirror(
+        CustomMessage('ProgressPage3f') + ' ' + IntToStr(i + 1) + '/' + IntToStr(GetArrayLength(Platforms[SelectedPlatform].OverrideUrls)),
+        Platforms[SelectedPlatform].OverrideUrls[i],
+        Platforms[SelectedPlatform].OverrideUrls[i],
+        'override_' + IntToStr(i) + '.7z'
+      );
+  end;
 
   except
     MsgBox(CustomMessage('DownloadToTempWithMirror3') + GetExceptionMessage(), mbError, MB_OK);
@@ -905,31 +1112,40 @@ begin
     if (not SkipLangFiles) then
     begin
       ProgressPage.SetText(CustomMessage('ProgressPage3b'), '');
-      ExtractArchive(LangZipPath, GamePath);
+      ExtractArchive(LangZipPath, GetLangDestination);
     end;
 
     ProgressPage.SetText(CustomMessage('ProgressPage3c'), '');
-    ExtractArchive(ScriptsZipPath, ExpandConstant('{tmp}\scripts'));
+    ExtractArchive(ScriptsZipPath, ExpandConstant('{tmp}\DeltaSetup\scripts'));
+
+    if NeedsBorders then
+    begin
+      ProgressPage.SetText(CustomMessage('ProgressPage3e'), '');
+      ExtractArchive(BordersZipPath, ExpandConstant('{tmp}\DeltaSetup\borders'));
+    end;
     
     ProgressPage.SetText(CustomMessage('ProgressPage3d'), '');
     PatcherPath := ExpandConstant('{tmp}\DeltaPatcherCLI.exe');
 
     ArgString := '';
 
+    if Platforms[SelectedPlatform].NeedsOutputPath then
+      ArgString := ArgString + ' --output "' + GamePathPage.Values[OutputPathIndex] + '"';
+
     if Platforms[SelectedPlatform].CliFlag <> '' then
     begin
       ArgString := ArgString + ' ' + Platforms[SelectedPlatform].CliFlag;
     end;
 
-    if (ShowPlatformSelect) or ParamExists('/FORCESHOWPLATFORMSELECT') then
+    i := 0;
+    while FileExists(ExpandConstant('{tmp}\override_' + IntToStr(i) + '.7z')) do
     begin
-      if Platforms[SelectedPlatform].ForceBorders or BordersCheckbox.Checked then
-        ArgString := ArgString + ' --borders';
-    end
-    else
-    begin
-      if Platforms[SelectedPlatform].ForceBorders then
-        ArgString := ArgString + ' --borders';
+      OverrideZipPath := ExpandConstant('{tmp}\override_' + IntToStr(i) + '.7z');
+      OverrideDestDir := ExpandConstant('{tmp}\DeltaSetup\override_' + IntToStr(i));
+      ProgressPage.SetText(CustomMessage('ProgressPage3g') + ' ' + IntToStr(i + 1), '');
+      ExtractArchive(OverrideZipPath, OverrideDestDir);
+      ArgString := ArgString + ' --override "' + OverrideDestDir + '"';
+      Inc(i);
     end;
 
     if MakeBackups then
@@ -937,6 +1153,7 @@ begin
       ArgString := ArgString + ' --make-backups'
     end;
 
+    PatchAll := True;
     for i := 0 to Length(FilesToPatch) - 1 do begin
       if FilesToPatch[i] then
       begin
@@ -947,7 +1164,7 @@ begin
 
     if (not PatchAll) then
     begin
-      ArgString := ArgString + ' --files '
+      ArgString := ArgString + ' --files ';
       for i := 0 to Length(FilesToPatch) - 1 do begin
         if not FilesToPatch[i] then
         begin
@@ -955,8 +1172,13 @@ begin
         end;
       end;
     end;
+
+    if NeedsBorders then
+    begin
+        ArgString := ArgString + ' --borders';
+    end;
     
-    if Exec(PatcherPath, Format('--game "%s" --scripts "%s"%s', [GamePath, ExpandConstant('{tmp}\scripts'), ArgString]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+    if Exec(PatcherPath, Format('--game "%s" --scripts "%s"%s', [GamePath, ExpandConstant('{tmp}\DeltaSetup\scripts'), ArgString]), '', SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
       if ResultCode <> 0 then
       begin
@@ -992,9 +1214,9 @@ begin
   if CurStep = ssPostInstall then
     if not DownloadAndExtractFiles() then
     begin
-      FinishedText := CustomMessage('FinishedText3a') + #13#10 +
-                      + #13#10 +
-                      CustomMessage('FinishedText3b');
+      FinishedText := CustomMessage('FinishedText3a') + #13#10
+                      + #13#10
+                      + CustomMessage('FinishedText3b');
     end;
 end;
 
@@ -1006,6 +1228,15 @@ begin
     WizardForm.FinishedLabel.Caption := FinishedText;
   end;
   ExtraButton.Visible := (CurPageID = GamePathPage.ID);
+  if CurPageID = GamePathPage.ID then
+  begin
+    GamePathPage.Edits[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
+    GamePathPage.Buttons[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
+    GamePathPage.PromptLabels[OutputPathIndex].Visible := Platforms[SelectedPlatform].NeedsOutputPath;
+
+    if GamePathPage.Values[OutputPathIndex] = '' then
+      GamePathPage.Values[OutputPathIndex] := GamePathPage.Values[0];
+  end;
 end;
 
 procedure CloseInstaller;

@@ -39,5 +39,9 @@
         public const string Warning1 	        = "WARNING";
         public const string ScriptMessage1      = "[SCRIPT MESSAGE]";
         public const string ScriptWarning1      = "[SCRIPT WARNING]";
+        public const string CopyingFiles1       = "Copying game files...";
+        public const string PackagingPacks1     = "Making packs:";
+        public const string Done1               = "Done!";
+        public const string BordersError1       = "The borders directory was not found!";
     }
 }
