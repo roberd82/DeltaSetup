@@ -270,9 +270,33 @@ internal class Program
             
             if (overridePaths is not null)
             {
-                foreach (var overridePath in overridePaths) 
+                foreach (var overridePath in overridePaths)
                 {
-                    CopyDirectory(overridePath, scriptsPath);
+                    List<string> excludedPaths = [];
+                    var workingPath = Path.Join(overridePath, "MoreSharedCodeChanges.txt");
+                    if (File.Exists(workingPath))
+                    {
+                        var newFileName = "MoreSharedCodeChanges.txt";
+                        while (File.Exists(Path.Join(scriptsPath, newFileName)))
+                            newFileName = "More" + newFileName;
+                        excludedPaths.Add(workingPath);
+                        FileCopyNoReadOnly(workingPath, Path.Join(scriptsPath, newFileName));
+                    }
+
+                    foreach (var dir in Directory.GetDirectories(overridePath))
+                    {
+                        workingPath = Path.Join(dir, "MoreCodeChanges.txt");
+                        if (!File.Exists(workingPath))
+                            continue;
+                        var dirName = new DirectoryInfo(dir).Name;
+                        var newFileName = "MoreCodeChanges.txt";
+                        while (File.Exists(Path.Join(scriptsPath, dirName, newFileName)))
+                            newFileName = "More" + newFileName;
+                        excludedPaths.Add(workingPath);
+                        FileCopyNoReadOnly(workingPath, Path.Join(scriptsPath, dirName, newFileName));
+                    }
+                    
+                    CopyDirectory(overridePath, scriptsPath, [.. excludedPaths]);
                 }
             }
 
@@ -300,15 +324,17 @@ internal class Program
 
             _filesToPatch ??= FindPresentChapters(gamePath);
             
-            if (File.Exists(Path.Join(scriptsPath, "MoreSharedCodeChanges.txt")))
+            var moreChangesName = "MoreSharedCodeChanges.txt";
+            while (File.Exists(Path.Join(scriptsPath, moreChangesName)))
             {
                 // append MoreSharedCodeChanges.txt to SharedCodeChanges if exists
                 var codePath = Path.Join(scriptsPath, "SharedCodeChanges.txt");
-                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, "MoreSharedCodeChanges.txt"));
+                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, moreChangesName));
                 var codeChanges = "";
                 if (File.Exists(codePath))
                     codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
                 await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
+                moreChangesName = "More" + moreChangesName;
             }
 
             foreach (var (chapter, value) in _filesToPatch)
@@ -573,18 +599,24 @@ internal class Program
         Directory.Delete(dirPath, recursive);
     }
 
-    public static void CopyDirectory(string sourceDir, string destDir)
-    {
+    public static void CopyDirectory(string sourceDir, string destDir, string[] excludedPaths = null) {
+        excludedPaths ??= [];
         Directory.CreateDirectory(destDir);
 
         foreach (var file in Directory.GetFiles(sourceDir))
         {
+            if (excludedPaths.Contains(file))
+                continue;
+            
             var destFile = Path.Combine(destDir, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);
         }
 
         foreach (var dir in Directory.GetDirectories(sourceDir))
         {
+            if (excludedPaths.Contains(dir))
+                continue;
+            
             var destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
             CopyDirectory(dir, destSubDir);
         }
@@ -654,15 +686,17 @@ internal class Program
             }
             WriteLine(LocalizedText.ApplyPatch7);
             
-            if (File.Exists(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt")))
+            var moreChangesName = "MoreCodeChanges.txt";
+            while (File.Exists(Path.Join(scriptsPath, moreChangesName)))
             {
                 // append MoreCodeChanges.txt to CodeChanges if exists
                 var codePath = Path.Join(scriptsPath, chapter, "CodeChanges.txt");
-                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, chapter, "MoreCodeChanges.txt"));
+                var moreChanges = await File.ReadAllTextAsync(Path.Join(scriptsPath, chapter, moreChangesName));
                 var codeChanges = "";
                 if (File.Exists(codePath))
                     codeChanges += await File.ReadAllTextAsync(codePath) + "\n";
                 await File.WriteAllTextAsync(codePath, codeChanges + moreChanges);
+                moreChangesName = "More" + moreChangesName;
             }
 
             foreach (var scriptName in scriptList)

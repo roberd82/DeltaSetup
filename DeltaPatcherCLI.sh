@@ -15,7 +15,11 @@
 #    - from here: https://github.com/iBotPeaches/Apktool/releases/latest
 #      - the latest apktool.jar (OPTIONAL, only if you want to make DeltaQuick packs for Android)
 #
-# 2. Extract them next to the DeltaPatcherCLI executable so your folder looks like this:
+# 2. In Steam right-click DELTARUNE -> Manage -> Browse local files, then put this file,
+#    the executable, and the extracted folders next to the __MACOSX and DELTARUNE.app folders, so
+#    that the game folder looks like this:
+#    - __MACOSX
+#    - DELTARUNE.app
 #    - DeltaPatcherCLI.sh
 #    - DeltaPatcherCLI
 #    - scripts <- copy the contents of quicktale.7z into this folder and let it override everything
@@ -23,7 +27,8 @@
 #    - borders
 #    - apktool.jar <- remove the version number from the file name
 # 
-# 3. Edit the CONFIGURATION section below, each setting has a description on what it does
+# 3. Edit the CONFIGURATION section below, each setting has a description on what it does.
+#    (The settings are set to the macOS defaults by default.)
 #
 # 4. Make sure this file (DeltaPatcherCLI.sh) is executable:
 #    - (in terminal) chmod +x DeltaPatcherCLI.sh
@@ -31,15 +36,18 @@
 # 5. Run the script:
 #    - (in terminal) ./DeltaPatcherCLI.sh
 
+
 set -euo pipefail
+# Name of the executable (don't change)
+EXE_NAME="DeltaPatcherCLI"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+EXE_PATH="${SCRIPT_DIR}/${EXE_NAME}"
+
 
 # ========================================= CONFIGURATION ==========================================
 
-# Name of the executable (don't change)
-EXE_NAME="DeltaPatcherCLI"
-
 # Path to the DELTARUNE game installation (required).
-GAME_PATH=""
+GAME_PATH="${SCRIPT_DIR}/DELTARUNE.app"
 
 # Output directory (optional). Where the lang folder will be copied, and where the packs folder will
 # be created when creating QuickTale pack files. If left blank defaults to GAME_PATH.
@@ -62,9 +70,6 @@ MAKE_BACKUPS=false
 FILES_TO_SKIP=()
 
 # ======================================= CONFIGURATION END ========================================
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EXE_PATH="${SCRIPT_DIR}/${EXE_NAME}"
 
 # Path to the extracted scripts folder (required).
 SCRIPTS_PATH="${SCRIPT_DIR}/scripts"
