@@ -70,9 +70,9 @@ BORDERS=false
 # Set to true from false to make backups of the game files
 MAKE_BACKUPS=false
 
-# List chapters you don't want to get patched like this:
-# FILES_TO_SKIP=(0 2) skips the menu (0) and Chapter 2, leave blank to patch every chapter
-FILES_TO_SKIP=()
+# List chapters you want to get patched like this:
+# FILES_TO_PATCH=(0 1) only pathces the menu (0) and Chapter 2
+FILES_TO_PATCH=(0 1 2 3 4 5)
 
 # ===================================== CONFIGURATION END ======================================
 
@@ -148,9 +148,9 @@ if [[ "${MAKE_BACKUPS}" == true ]]; then
     ARGS+=(--make-backups)
 fi
 
-if [[ ${#FILES_TO_SKIP[@]} -gt 0 ]]; then
+if [[ ${#FILES_TO_PATCH[@]} -gt 0 ]]; then
     files_arg=""
-    for chapter in "${FILES_TO_SKIP[@]}"; do
+    for chapter in "${FILES_TO_PATCH[@]}"; do
         if [[ -n "${files_arg}" ]]; then
             files_arg="${files_arg},"
         fi

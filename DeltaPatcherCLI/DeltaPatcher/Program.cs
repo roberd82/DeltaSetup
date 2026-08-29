@@ -687,7 +687,7 @@ internal class Program
             WriteLine(LocalizedText.ApplyPatch7);
             
             var moreChangesName = "MoreCodeChanges.txt";
-            while (File.Exists(Path.Join(scriptsPath, moreChangesName)))
+            while (File.Exists(Path.Join(scriptsPath, chapter, moreChangesName)))
             {
                 // append MoreCodeChanges.txt to CodeChanges if exists
                 var codePath = Path.Join(scriptsPath, chapter, "CodeChanges.txt");
